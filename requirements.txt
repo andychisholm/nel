@@ -1,0 +1,16 @@
+Cython==0.20.2
+Flask==0.10.1
+argparse==1.2.1
+boilerpipe==1.2.0.0
+functools32==3.2.3-1
+libschwa-python==0.4.0
+msgpack-python==0.4.2
+nltk==2.0.4
+numpy==1.8.1
+python-dateutil==2.2
+scikit-learn==0.14.1
+scipy==0.14.0
+six==1.8.0
+thrift==0.9.1
+wsgiref==0.1.2
+requests==2.5.1
