@@ -79,7 +79,7 @@ class ExtractFeature(object):
             total_chains += len(doc.chains)
             total_candidates += sum(len(m.candidates) for m in doc.chains)
 
-            if total_docs % 50 == 0:
+            if total_docs % 100 == 0:
                 duration = float(time() - start_time)
                 log.info(
                     'Extracted feature for %i docs... ( %.2f d/s %.2f ch/s %.2f c/s )',
