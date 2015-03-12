@@ -120,7 +120,7 @@ class BatchLink(object):
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('corpus', metavar='CORPUS')
+        p.add_argument('--corpus', metavar='CORPUS')
         p.add_argument('--tag', metavar='TAG', default=None, required=False)
         p.add_argument('--fmt', metavar='FORMAT', default='neleval', choices=['neleval'], required=False)
         p.add_argument('--ranker', metavar='RANKER', default=None, required=False)
