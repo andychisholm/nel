@@ -1,7 +1,4 @@
 import logging
-
-from nltk.corpus import stopwords
-from nltk.stem.wordnet import WordNetLemmatizer
 from .util.kopireader import KopiReader
 
 log = logging.getLogger()
@@ -74,6 +71,8 @@ class BuildKopiWikiEntityContext(object):
 
         self.link = Links.read(self.link_model_path) # {entity: [out_link_targets]} dictionary
     
+        from nltk.corpus import stopwords
+        from nltk.stem.wordnet import WordNetLemmatizer
         self.commoners = frozenset(iter_common_lemma_names())
         self.stops = frozenset(stopwords.words('english'))
         self.lemma = WordNetLemmatizer().lemmatize

@@ -1,6 +1,4 @@
 #!/bin/sh
-STANFORD_VERSION=2014-08-27
-STANFORD_NER_ROOT=/data0/linking/ner/stanford-ner-$STANFORD_VERSION/
 STANFORD_NER_PATH=$STANFORD_NER_ROOT/stanford-ner.jar
 STANFORD_NER_MODEL=$STANFORD_NER_ROOT/classifiers/english.all.3class.distsim.crf.ser.gz
 

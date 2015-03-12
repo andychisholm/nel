@@ -1,11 +1,9 @@
 #!/bin/bash
 set -e
 
-APP_ROOT_PATH=~/bobwilson
-APP=$APP_ROOT_PATH/run
+APP=$NEL_ROOT/run
 
-NELEVAL_PATH=~/repos/neleval
-OUTPUT_PATH=$APP_ROOT_PATH/output/
+OUTPUT_PATH=$NEL_ROOT/output/
 MODEL_PATH=/data0/linking/models
 
 PRIOR_MODEL_PATH=$MODEL_PATH/wikipedia.entity.model
@@ -91,7 +89,7 @@ if $RUN_EVAL; then
         --ranker $LINKING_FEATURE \
         > $OUTPUT_PATH/system.test.tsv
 
-    pushd $NELEVAL_PATH > /dev/null
+    pushd $NELEVAL_ROOT > /dev/null
     ./nel evaluate \
         -m strong_mention_match \
         -m strong_link_match \

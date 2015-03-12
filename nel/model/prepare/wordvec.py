@@ -49,7 +49,6 @@ class BuildWordVectors(object):
         return p
 
 from six import iteritems
-from gensim.models.doc2vec import Doc2Vec
 from collections import namedtuple
 from schwa import dr
 from time import time
@@ -91,6 +90,7 @@ class BuildEntityEmbeddings(object):
         #        eta = ((total - i)/rate)/60
         #        log.info('Processed %i docs (%.2f), rate: %.1f/s, eta: %.1f mins', i, i*100.0/total, rate, eta)
 
+        from gensim.models.doc2vec import Doc2Vec
         model_dm = Doc2Vec(sentences=None, size=VEC_SIZE, window=WINDOW_SIZE, min_count=MIN_COUNT, workers=30, dm=1, sample=1e-3)
         log.info("Building vocab...")
         model_dm.build_vocab(self.iter_labeled_text())

@@ -218,6 +218,7 @@ class MaxDBoWMentionContext(DBoWMentionContext):
                 bow[i] = min_bow[i]
         return bow
 
+"""
 import marshal
 from gensim.models.doc2vec import Doc2Vec
 from ..model.prepare.wordvec import LabeledText
@@ -227,7 +228,7 @@ logging.getLogger("gensim.models.word2vec").setLevel(logging.WARNING)
 
 @Feature.Extractable
 class EmbeddingSimilarity(Feature):
-    """ Entity embedding similarity """
+    " Entity embedding similarity "
     def __init__(self, model_path):
         self.model = Doc2Vec.load(model_path, mmap='r')
         log.info('Vocab size: %i, %i entities', len(self.model.vocab), sum(1 for k in self.model.vocab if k[0] == '~'))
@@ -268,7 +269,7 @@ class EmbeddingSimilarity(Feature):
 
 @Feature.Extractable
 class CRPClusteredDBoWContext(BoWMentionContext):
-    """ Similarity over document vectors partitioned via a Chinese Restaurant Process """
+    " Similarity over document vectors partitioned via a Chinese Restaurant Process "
     def __init__(self, **kwargs):
         self.wordvec_model_path = kwargs.pop('wordvec_model_path')
         self.wordvec_model = WordVectors.read(self.wordvec_model_path)
@@ -350,4 +351,4 @@ class CRPClusteredDBoWContext(BoWMentionContext):
         super(CRPClusteredDBoWContext, cls).add_arguments(p)
         p.add_argument('wordvec_model_path', metavar='WORD_VECTOR_MODEL')
         return p
-
+"""

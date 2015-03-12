@@ -245,7 +245,6 @@ class BuildCandidateModel(object):
                 yield entity, name
         alias_model = None
 
-        """
         log.info('Enumerating redirects...')
         for source, target in self.redirects.iteritems():
             yield target, self.convert_title_to_name(source)
@@ -264,7 +263,6 @@ class BuildCandidateModel(object):
             for entity in entities:
                 yield self.redirects.get(entity, entity), name
         name_model = None
-        """
 
     def __call__(self):
         log.info('Building candidate model...')

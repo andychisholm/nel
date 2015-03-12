@@ -1,8 +1,7 @@
 #!/bin/bash
 set -e
 
-APP_ROOT_PATH=~/bobwilson
-APP=$APP_ROOT_PATH/run
+APP=$NEL_ROOT/run
 
 if [ -z "$1" ]
 then

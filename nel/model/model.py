@@ -3,7 +3,6 @@ from __future__ import print_function
 
 from collections import Counter, defaultdict
 from functools32 import lru_cache
-from msgpack import Packer, Unpacker
 from pymongo import MongoClient
 
 import itertools

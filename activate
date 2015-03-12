@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# You may need to update these paths
+export NEL_ROOT=~/repos/nel                                         # nel repo
+export NEL_MODELS_ROOT=/data0/linking/models                        # model storage
+export NELEVAL_ROOT=~/repos/neleval                                 # neleval repo
+export STANFORD_NER_ROOT=/data0/linking/ner/stanford-ner-2014-08-27 # stanford ner tools
+. ve/bin/activate

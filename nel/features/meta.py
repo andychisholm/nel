@@ -9,7 +9,6 @@ from pymongo import MongoClient
 from collections import defaultdict
 from functools32 import lru_cache
 from scipy.sparse import csc_matrix
-from gensim.models.doc2vec import Doc2Vec
 
 from .feature import Feature
 from .mapping import FEATURE_MAPPERS
@@ -119,6 +118,8 @@ class MeanConditionalProbability(CoherenceBase):
         return p
 
 """
+from gensim.models.doc2vec import Doc2Vec
+
 @Feature.Extractable
 class EmbeddingCoherence(Feature):
     " Computes a relatedness feature score based on coherence between entities in the candidate set."

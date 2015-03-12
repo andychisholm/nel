@@ -1,7 +1,5 @@
 from ..model import Entity, Name
 
-from .util.nqstream import NqStream
-from .util.ntstream import NtStream
 
 import logging
 
@@ -33,6 +31,8 @@ class BuildDbpediaLexicalisations(object):
         return p
 
     def __call__(self):
+        from .util.nqstream import NqStream
+        from .util.ntstream import NtStream
         entity = Entity()
         names = Name()
 
