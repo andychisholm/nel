@@ -1,0 +1,103 @@
+#!/bin/bash
+set -e
+
+APP_ROOT_PATH=~/bobwilson
+APP=$APP_ROOT_PATH/run
+
+NELEVAL_PATH=~/repos/neleval
+OUTPUT_PATH=$APP_ROOT_PATH/output/
+MODEL_PATH=/data0/linking/models
+
+PRIOR_MODEL_PATH=$MODEL_PATH/wikipedia.entity.model
+NAME_MODEL_PATH=$MODEL_PATH/wikipedia.name.model
+ENTITY_CTX_TF_PATH=$MODEL_PATH/wikipedia.entity_context.w_none.tf.model
+ENTITY_CTX_IDF_PATH=$MODEL_PATH/wikipedia.entity_context.w_none.idf.model
+OCCURRENCE_MODEL_PATH=$MODEL_PATH/wikipedia.occurrence.model
+
+CORPUS=conll
+RANKER_NAME=default
+RERANKER_NAME=reranker
+
+RANKER_FEATURE=ClassifierScore[$RANKER_NAME]
+RERANKER_FEATURE=ClassifierScore[$RERANKER_NAME]
+
+EXTRACT_FEATURES=false
+TRAIN_RANKER=false
+EXTRACT_COHERENCE=false
+TRAIN_RERANKER=false
+RUN_EVAL=true
+
+LINKING_FEATURE=$RANKER_FEATURE
+
+if $EXTRACT_FEATURES; then
+    $APP extract-feature \
+        --corpus $CORPUS \
+        EntityProbability \
+            $PRIOR_MODEL_PATH
+
+    $APP extract-feature \
+        --corpus $CORPUS \
+        NameProbability \
+            $NAME_MODEL_PATH
+
+    $APP extract-feature \
+        --corpus $CORPUS \
+        BoWMentionContext \
+            full \
+            $ENTITY_CTX_IDF_PATH \
+            $ENTITY_CTX_TF_PATH
+fi
+
+if $TRAIN_RANKER; then
+    $APP train \
+        $RANKER_NAME \
+        --corpus $CORPUS \
+        --feature EntityProbability \
+        --feature NameProbability \
+        --feature BoWMentionContext
+
+    $APP extract-feature \
+        --corpus $CORPUS \
+        ClassifierScore \
+            $RANKER_NAME
+fi
+
+if $EXTRACT_COHERENCE; then
+    $APP extract-feature
+        MeanConditionalProbability
+            ClassifierScore[$RANKER_NAME]
+            $OCCURRENCE_MODEL_PATH
+    
+    $APP train \
+        $RERANKER_NAME \
+        --corpus $CORPUS \
+        --feature EntityProbability \
+        --feature NameProbability \
+        --feature BoWMentionContext \
+        --feature ClassifierScore[$RANKER_NAME] \
+        --feature MeanConditionalProbability[ClassifierScore[$RANKER_NAME]]
+
+    $APP extract-feature \
+        --corpus $CORPUS
+        ClassifierScore
+            $RERANKER_NAME
+fi
+
+if $RUN_EVAL; then
+    $APP batch-link \
+        --corpus $CORPUS \
+        --tag test \
+        --fmt neleval \
+        --ranker $LINKING_FEATURE \
+        > $OUTPUT_PATH/system.test.tsv
+
+    pushd $NELEVAL_PATH > /dev/null
+    ./nel evaluate \
+        -m strong_mention_match \
+        -m strong_link_match \
+        -m entity_match \
+        -f tab \
+        -g $OUTPUT_PATH/gold.test.tsv \
+        $OUTPUT_PATH/system.test.tsv
+    popd > /dev/null
+fi
