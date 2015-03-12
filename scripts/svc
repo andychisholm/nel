@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+
+APP_ROOT_PATH=~/bobwilson
+APP=$APP_ROOT_PATH/run
+
+if [ -z "$1" ]
+then
+    printf "Run as:\n\t$0 config.json\n"
+else
+
+HOST=0.0.0.0
+PORT=8080
+CONFIG_PATH=$1
+
+$APP service-harness 0.0.0.0 8080 OnlineLinker $CONFIG_PATH
+
+fi
