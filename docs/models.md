@@ -41,11 +41,13 @@ entities | The set of candidate entity ids for this alias | `['John_Smith', 'Joh
 ### Classifiers
 
 #### Storage
+
 Database | Collection
--|-
-models | classifiers
+-------- | ----------
+models   | classifiers
 
 #### Schema
+
 ```
 {
 	'_id': string,
@@ -62,8 +64,9 @@ models | classifiers
 	}
 }
 ```
+
 Field | Content | Example
-- | - | -
+----- | ------- | -------
 _id | Identifier string for the classifier. | default
 weights | Feature weight vector | `[0.1, 0.2, 0.3]`
 corpus | The corpus id this classifier was trained over | conll
@@ -76,6 +79,7 @@ mapping.params.features | Projected feature means | `[0.1, 0.2]`
 mapping.params.features | Projected feature standard deviations | `[0.1, 0.2]` 
 
 #### Queries
+
 * Select by `_id`
 
 ## Offline Components
@@ -87,15 +91,17 @@ Given a corpus of documents (e.g. CoNLL, TACs), we process documents from their 
 Feature extraction, model training and linking operations may then be ran over each collection or some subset.
 
 #### Storage
+
 Database | Collection
--|-
-docs | `corpus_name`
+-------- | ----------
+docs     | `corpus_name`
 
 > Where `corpus_name` is the name of the corpus, e.g. `conll`.
 
 > **Note: ** Thinking of changing this to allow for easier cross-corpus queries.
 
 #### Schema
+
 ```
 {
 	'_id': string,
@@ -117,8 +123,9 @@ docs | `corpus_name`
 	}]
 }
 ```
+
 Field       | Content | Example
------------ | --- |
+----------- | ------- | -------
 _id | A document identifier | Sport 123 testb
 tag | A tag for the document within the corpus. Useful for tracking train/dev/test splits | train
 text | Plaintext document content | The cat sat on the mat
