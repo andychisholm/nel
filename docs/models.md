@@ -14,19 +14,22 @@ These components are used in the online linking pipeline.
 We need a way of mapping names we find in text to a set of candidate entities for that name.
 
 #### Storage
-Database | Collection
--|-
-models | aliases
+
+Database  | Collection
+--------- | ----------
+models    | aliases
 
 #### Schema
+
 ```
 {
 	'_id': string,
 	'entities': list(string)
 }
 ```
+
 Field       | Content | Example
------------ | --- |
+----------- | ------- | -------
 _id | An entity alias | john smith
 entities | The set of candidate entity ids for this alias | `['John_Smith', 'John_Smith_(actor)']`
 
