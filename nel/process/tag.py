@@ -60,8 +60,8 @@ class Tagger(Process):
         return chains
 
     def __call__(self, doc):
-        assert hasattr(doc, 'tokens'), 'doc must have tokens'
         doc.chains = self.cluster_mentions(self._tag(doc))
+        return doc
 
     def _tag(self, doc):
         """Yield mention annotations."""
@@ -77,20 +77,15 @@ class Tagger(Process):
         return Mention(begin, text)
 
 class CandidateGenerator(Process):
-    def __init__(self, name_model_path):
+    def __init__(self):
         self.candidates = model.Candidates()
-
-        n = model.Name(lower=True)
-        n.read(name_model_path)
-        self.entities_by_name =  {k:v.keys() for k, v in n.d.iteritems()}
-    
+ 
     def __call__(self, doc):
         for chain in doc.chains:
             forms = sorted(set(m.text for m in chain.mentions),key=len,reverse=True)
             candidates = []
             for sf in forms:
-                candidates = set(self.candidates.search(sf)).union(
-                             set(self.entities_by_name.get(sf.lower(), [])))
+                candidates = self.candidates.search(sf)
                 if candidates:
                     break
             chain.candidates = [Candidate(c) for c in candidates]
