@@ -1,0 +1,52 @@
+{
+    "tagger": {
+        "name": "StanfordTagger",
+        "params": {
+            "host": "127.0.0.1",
+            "port": 1447
+        }
+    },
+    "candidate_generation": {
+        "name": "CandidateGenerator",
+        "params": {
+        }
+    },
+    "features": [{
+            "name": "EntityProbability",
+            "params": {
+                "entity_model_path":    "/data0/linking/models/wikipedia.entity.model"
+            }
+        }, {
+            "name":"NameProbability",
+            "params": {
+                "name_model_path":      "/data0/linking/models/wikipedia.name.model"
+            }
+        }, {
+            "name": "BoWMentionContext",
+            "params": {
+                "query_ctx_window": "full",
+                "idf_model_path": "/data0/linking/models/wikipedia.entity_context.w_none.idf.model",
+                "entity_ctx_model_path": "/data0/linking/models/wikipedia.entity_context.w_none.tf.model"
+            }
+        }, {
+            "name":"ClassifierScore",
+            "params": {
+                "classifier_id": "default"
+            }
+        }, {
+            "name":"MeanConditionalProbability",
+            "params": {
+                "ranker": "ClassifierScore[default]",
+                "occurrence_model_path": "/data0/linking/models/wikipedia.occurrence.model"
+            }
+        }, {
+            "name": "ClassifierScore",
+            "params": {
+                "classifier_id": "reranker"
+            }
+        }
+    ],
+    "resolver": {
+        "feature": "ClassifierScore[reranker]"
+    }
+}
