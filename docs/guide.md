@@ -1,6 +1,5 @@
 Linker Setup from Scratch
 ===================
-[TOC]
 
 # Prerequisites
 
@@ -98,6 +97,7 @@ Once they exist!
 ## Data sources
 
 Wikipedia ([downloads](http://dumps.wikimedia.org/enwiki/), [latest](http://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2))
+
 Wikilinks ([downloads](http://www.iesl.cs.umass.edu/data/wiki-links#TOC-Dataset-with-Context))
 
 # Running the Linker as a Service
