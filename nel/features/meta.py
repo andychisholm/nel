@@ -3,6 +3,7 @@ import operator
 import cPickle as pickle
 import numpy as np
 import math
+import json
 import marshal
 
 from pymongo import MongoClient
@@ -20,16 +21,23 @@ log = logging.getLogger()
 @Feature.Extractable
 class ClassifierScore(Feature):
     """ Computes a feature score based on the output of a classifier over a set of features. """
-    def __init__(self, classifier_id):
-        log.debug('Loading classifier (%s)...', classifier_id)
+    def __init__(self, classifier, provider=None):
+        provider = provider or 'mongo'
         
-        store = MongoClient().models.classifiers
+        log.info('Loading classifier (%s) via (%s)...', classifier, provider)
+        
+        if provider == 'mongo':
+            store = MongoClient().models.classifiers
+            model = store.find_one({'_id':classifier})
+            if not model:
+                raise ValueError('Found no classifier with id (%s) in store.' % classifier)
+        elif provider == 'file':
+            with open(classifier, 'r') as f:
+                model = json.load(f)
+        else:
+            raise NotImplementedError
 
-        model = store.find_one({'_id':classifier_id})
-        if not model:
-            raise ValueError('Found no classifier with id (%s) in store.' % classifier_id)
-
-        self._id = classifier_id
+        self._id = model['_id']
         self.weights = np.array(model['weights']).T
         self.mapper = FEATURE_MAPPERS[model['mapping']['name']](**model['mapping']['params'])
 
@@ -46,7 +54,8 @@ class ClassifierScore(Feature):
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('classifier_id', metavar='CLASSIFIER')
+        p.add_argument('classifier', metavar='CLASSIFIER')
+        p.add_argument('--provider', metavar='PROVIDER', choices=['mongo','file'], default='mongo', required=False)
         p.set_defaults(featurecls=cls)
         return p
 
