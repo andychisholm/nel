@@ -12,7 +12,7 @@ from ..linkers import LINKERS, RankingResolver
 from ..harness import format
 
 # not referenced explicitly but must be imported to register extractable annots
-from ..features import probability, context, meta, freebase # pylint: disable=I0011,W0611
+from ..features import probability, context, meta # pylint: disable=I0011,W0611
 
 import logging
 log = logging.getLogger()
