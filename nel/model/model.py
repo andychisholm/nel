@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 from __future__ import print_function
-
 from collections import Counter, defaultdict
 from functools32 import lru_cache
-from pymongo import MongoClient
+from .data import Store
 
 import itertools
 import marshal
@@ -145,16 +144,16 @@ class Name(object):
 
 class Candidates(object):
     def __init__(self):
-        self.store = MongoClient()['models']['aliases']
+        self.store = Store.Get('models:aliases')
 
     def search(self, alias):
-        res = self.store.find_one({'_id':alias.lower()})
+        res = self.store.fetch(alias.lower())
         return res['entities'] if res else []
 
     def set(self, alias, entities):
         self.store.save({
-            '_id':alias,
-            'entities':entities
+            '_id': alias,
+            'entities': entities
         })
 
     @staticmethod
@@ -170,30 +169,31 @@ class Candidates(object):
                 entities_by_name[self.normalise_alias(name)].add(entity)
 
         log.info("Dropping existing candidate set...")
-        self.store.drop()
+        self.store.flush()
 
         items_iter = entities_by_name.iteritems()
         total = len(entities_by_name)
-        batch_sz = 1000000
+        batch_sz = 250000
         for i in xrange(0, total, batch_sz):
             log.info("Inserted %i / %i...", i, total)
-            self.store.insert({
-                '_id':alias,
-                'entities':list(entities)
+            self.store.save_many({
+                '_id': alias,
+                'entities': list(entities)
             } for alias, entities in itertools.islice(items_iter, batch_sz))
 
         log.info("Done.")
 
 class Redirects(object):
     def __init__(self):
-        self.store = MongoClient()['models']['redirects']
+        from .data import MongoStore
+        self.store = MongoStore('models','redirects') #Store.Get('models:redirects')
     
     def map(self, entity):
-        mapping = self.store.find_one({'_id':entity})
+        mapping = self.store.fetch(entity)
         return mapping['target'] if mapping else entity
 
     def dict(self):
-        return {r['_id']:r['target'] for r in self.store.find()}
+        return {r['_id']:r['target'] for r in self.store.fetch_all()}
 
 class EntityCooccurrence(object):
     def __init__(self, cooccurrence_counts = None, occurrence_counts = None):
@@ -383,7 +383,7 @@ class mmdict(object):
         self.index = {}
         
         index_path = self.path + '.index'
-        log.debug('Loading memory mapped dictionary: %s ...' % index_path)
+        log.debug('Loading mmap store: %s ...' % index_path)
         with open(index_path, 'rb') as f:
             while True:
                 try:
