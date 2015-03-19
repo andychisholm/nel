@@ -12,6 +12,6 @@ HOST=0.0.0.0
 PORT=8080
 CONFIG_PATH=$1
 
-$APP service-harness 0.0.0.0 8080 OnlineLinker $CONFIG_PATH
+$APP service-harness $HOST $PORT OnlineLinker $CONFIG_PATH
 
 fi
