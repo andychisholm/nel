@@ -4,16 +4,24 @@ from ..process.process import Process
 FEATURE_SET = set()
 
 class Feature(object):
+    def __init__(self):
+        self._tag = None
+
     @staticmethod
     def Extractable(c):
         FEATURE_SET.add(c)
         return c
 
     @property
+    def tag(self):
+        return self._tag
+    @tag.setter
+    def tag(self, value):
+        self._tag = value
+
+    @property
     def id(self):
-        # todo: should be abstract to avoid collisions for duplicate feature types instanced by separate sources
-        # raise NotImplementedError 
-        return self.__class__.__name__
+        return self.__class__.__name__ + ('' if not self.tag else '[{}]'.format(self.tag))
 
     def __call__(self, doc):
         state = self.compute_doc_state(doc)

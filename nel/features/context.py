@@ -34,6 +34,7 @@ class BoWMentionContext(Feature):
     """ Bag of Words similarity """
     EXCLUDED_LOW_IDF_TERMS = 40
     def __init__(self, query_ctx_window, idf_model_path, entity_ctx_model_path):
+        self.tag = entity_ctx_model_path.split('.')[0] # todo: parameterise tag
         self.query_window = None if query_ctx_window.lower() == 'full' else int(query_ctx_window)
         idfs = mmdict(idf_model_path)
         self.context_model = mmdict(entity_ctx_model_path)
@@ -44,7 +45,7 @@ class BoWMentionContext(Feature):
         self.vocab = {t:(i,idf) for i, (idf, t) in enumerate(sorted_idfs)}
         
         log.debug("Mention context feature (vocab size=%i) (query window=%s)" % (len(sorted_idfs), str(self.query_window)))
-        
+
     def counts_to_bow(self, counts):
         """ Convert term counts to a TF-IDF weighted Bag of Words """
         bow = {}
@@ -52,9 +53,8 @@ class BoWMentionContext(Feature):
             if t in self.vocab:
                 _, idf = self.vocab[t]
                 bow[t] = math.sqrt(count) * idf
-
         return bow
-    
+
     @staticmethod
     def ngrams(tokens, n, vocab):
         num_tokens = len(tokens)
