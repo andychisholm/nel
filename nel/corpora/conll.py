@@ -68,9 +68,6 @@ class ConllPrepare(object):
                 if cs:
                     if chain.resolution.id not in cs:
                         log.warn('Entity (%s) not in candidate set for (%s) in doc (%s).', chain.resolution.id, sf, doc.id)
-                        #if sf.lower() in chain.resolution.id.lower():
-                        #    import code
-                        #    code.interact(local=locals())
                     chain.candidates = [Candidate(e) for e in cs]
                 else:
                     log.warn('Missing alias (%s): %s' % (doc.id, sf))
@@ -104,7 +101,7 @@ class ConllPrepare(object):
                             position = (begin, begin + len(parts[2]) + dodgy_tokenisation_bs_offset)
                             doc_mentions.append((entity, position))
 
-                    if token.startswith(Conll.DOCSTART_MARKER):
+                    if token.startswith(DOCSTART_MARKER):
                         if doc_id != None and doc_id_predicate(doc_id):
                             doc_count += 1
                             yield Doc(' '.join(doc_tokens), doc_id, ConllPrepare.doc_tag_for_id(doc_id)), doc_mentions
@@ -113,14 +110,14 @@ class ConllPrepare(object):
                                 doc_id = None
                                 break 
                                 
-                        doc_id = token[len(Conll.DOCSTART_MARKER)+2:-1]
+                        doc_id = token[len(DOCSTART_MARKER)+2:-1]
                         doc_tokens = []
                         doc_mentions = []
                     elif doc_id != None:
                         doc_tokens.append(token)
 
             if doc_id != None and doc_id_predicate(doc_id):
-                yield Doc(' '.join(doc_tokens), doc_id, Conll.doc_tag_for_id(doc_id)), doc_mentions
+                yield Doc(' '.join(doc_tokens), doc_id, ConllPrepare.doc_tag_for_id(doc_id)), doc_mentions
 
     @staticmethod
     def doc_tag_for_id(doc_id):
