@@ -6,9 +6,8 @@ import marshal
 
 from collections import defaultdict,Counter
 from schwa import dr
+from .. import model
 
-from ..model import Entity
-from ..model import Name
 from ..model import Redirects
 from ..model import WordVectors
 from ..model import EntityMentionContexts
@@ -55,13 +54,10 @@ class BuildEntitySet(object):
 
 class BuildLinkModels(object):
     "Build link derived models from a docrep corpus."
-    def __init__(self, page_model_path, entity_set_model_path, redirect_model_path, entity_model_path, name_model_path, occurrence_model_path):
+    def __init__(self, page_model_path, entity_set_model_path, model_tag):
         self.page_model_path = page_model_path
         self.entity_set_model_path = entity_set_model_path
-        self.redirect_model_path = redirect_model_path
-        self.entity_model_path = entity_model_path
-        self.name_model_path = name_model_path
-        self.occurrence_model_path = occurrence_model_path
+        self.model_tag = model_tag
 
     def __call__(self):
         log.info('Building page link derived models from: %s', self.page_model_path)
@@ -74,22 +70,21 @@ class BuildLinkModels(object):
             name = dr.Field()
             links = dr.Store(Link)
 
-        entities = Entity()
-        names = Name()
-        occurrence = EntityOccurrence()
+        log.info('Loading redirects...')
+        redirects = Redirects().dict()
+        entity_counts = defaultdict(int)
+        name_entity_counts = defaultdict(lambda:defaultdict(int))
+        # occurrence = EntityOccurrence() # todo: occurrence model datastore backend
 
         log.info('Loading entity set...')
         entity_set = marshal.load(open(self.entity_set_model_path, 'rb'))
-
-        log.info('Loading redirect model...')
-        redirects = marshal.load(open(self.redirect_model_path, 'rb'))
 
         with open(self.page_model_path,'r')  as f:
             reader = dr.Reader(f, Doc.schema())
             for i, doc in enumerate(reader):
                 if i % 100000 == 0:
                     log.info('Processed %i documents...', i)
-
+                
                 for link in doc.links:
                     # we may want to ignore subsection links when generating name models
                     # sometimes a page has sections which refer to subsidiary entities
@@ -99,34 +94,30 @@ class BuildLinkModels(object):
                     target = redirects.get(target, target)
                     target = trim_subsection_link(link.target)
 
-                    occurrence.add(target, doc.name)
+                    #occurrence.add(target, doc.name)
 
                     # ignore out-of-kb links in entity and name probability models
                     if target in entity_set:
-                        entity_count = entities.d.get(target, 0.0)
-                        entity_name_count = names.d.get(link.anchor,{}).get(target, 0.0)
-                        
-                        entities.update(target, entity_count + 1)
-                        names.update(link.anchor, target, entity_name_count + 1)
+                        entity_counts[target] += 1
+                        name_entity_counts[self.normalise_name(link.anchor)][target] += 1
+        
+        ep_model = model.EntityPrior(self.model_tag)
+        ep_model.create(entity_counts.iteritems())
+        entity_counts = None
+        nep_model = model.NameProbability(self.model_tag)
+        nep_model.create(name_entity_counts.iteritems())
+        nep_model = None
+        
+        log.info('Done')
 
-        log.info('Converting P(entity) model counts to probabilities...')
-        entities.normalise()
-        entities.write(self.entity_model_path)
-
-        log.info('Converting P(entity|name) model counts to probabilities...')
-        names.normalise()
-        names.write(self.name_model_path)
-
-        occurrence.write(self.occurrence_model_path)
+    def normalise_name(self, name):
+        return name.lower()
 
     @classmethod
     def add_arguments(cls, p):
         p.add_argument('page_model_path', metavar='PAGE_MODEL_MODEL')
         p.add_argument('entity_set_model_path', metavar='ENTITY_SET_MODEL_PATH')
-        p.add_argument('redirect_model_path', metavar='REDIRECT_MODEL_MODEL')
-        p.add_argument('entity_model_path', metavar='ENTITY_MODEL_PATH')
-        p.add_argument('name_model_path', metavar='NAME_MODEL_PATH')
-        p.add_argument('occurrence_model_path', metavar='OCCURRENCE_MODEL_PATH')
+        p.add_argument('model_tag', metavar='MODEL_TAG')
         p.set_defaults(cls=cls)
         return p
 

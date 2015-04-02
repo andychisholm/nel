@@ -17,130 +17,115 @@ import mmap
 log = logging.getLogger()
 
 ENC = 'utf8'
-FMT_MARSHAL='marshal'
-FMT_TSV='tsv'
 
-class Entity(object):
+class EntityPrior(object):
     """ Entity prior. """
-    # entity serialization format constants
-    ENTITY_FMT_DEFAULT=FMT_MARSHAL
+    def __init__(self, tag):
+        self.mid = 'ecounts[{:}]'.format(tag)
+        self.store = Store.Get('models:' + self.mid)
 
-    def __init__(self):
-        self.d = {}
-
-    def normalise(self):
-        total = float(sum(self.d.itervalues()))
-        for k in self.d.iterkeys():
-            self.d[k] /= total
-
-    def score(self, entity):
+        metadata = Store.Get('models:meta').fetch(self.mid) or {}
+        self.count = metadata.get('count', 0)
+        self.total = metadata.get('total', 0)
+    
+    def prior(self, entity):
         "Return score for entity, default 1e-20."
-        return max(1e-20, self.d.get(entity, 0))
+        item = self.store.fetch(entity) or {}
+        count = float(item.get('count', 0))
 
-    def update(self, entity, score):
-        "Add score for entity."
-        self.d[entity] = score
+        return max(1e-20, count / self.total)
 
-    def write(self, path, fmt=ENTITY_FMT_DEFAULT):
-        log.info('Writing %s model for %i entities to file: %s ...', fmt, len(self.d), path)
-        with open(path, 'wb') as f:
-            if fmt == FMT_MARSHAL:
-                marshal.dump(self.d, f)
-            elif fmt == FMT_TSV:
-                print('entity\tprior'.encode(ENC), file=f)
-                for entity, value in self.d.iteritems():
-                    out = '%s\t%s' % (entity, str(value))
-                    print(out.encode(ENC), file=f)
-
-    def read(self, path, fmt=ENTITY_FMT_DEFAULT):
-        log.info('Reading %s entity model from file: %s ...', fmt, path)
-        with open(path, 'rb') as f:
-            if fmt == FMT_MARSHAL:
-                self.d = marshal.load(f)
-            elif fmt == FMT_TSV:
-                self.d = {}
-                f.readline()
-                for l in f:
-                    k, v = l.decode(ENC).split('\t')
-                    self.d[k] = float(v)
-
-class Name(object):
-    def __init__(self, lower=False):
-        self.lower = lower
-        self.d = {}
-
-    def entities(self, name):
-        "Return list of (score, entity) tuples for name."
-        return [(s,e) for e,s in self.d.get(name, {}).iteritems()]
-
-    def get_entities_by_name(self):
-        return {n : e.keys() for n,e in self.d.iteritems()}
-
-    def score(self, name, entity, candidates):
-        "Return score for name=>entity, default 0.0."
-        entities = self.d.get(name, {})
+    def create(self, entity_count_iter):
+        metadata_store = Store.Get('models:meta')
         
-        if entity in entities:
-            return entities[entity]
+        log.info('Flushing existing entity counts...')
+        self.store.flush()
+        metadata_store.delete(self.mid)
+
+        entity_count = 0
+        total_count = 0
+
+        batch = []
+        batch_sz = 250000
+        
+        log.info('Storing entity counts...')
+        for entity, count in entity_count_iter:
+            entity_count += 1
+            total_count += count
+            
+            batch.append({
+                '_id': entity,
+                'count': count
+            })
+            if len(batch) >= batch_sz:
+                self.store.save_many(batch)
+                log.debug('Stored %i entity counts...', entity_count)
+                batch = []
+        
+        if batch:
+            self.store.save_many(batch)
+            log.debug('Stored %i entity counts...', entity_count)
+        
+        metadata_store.save({
+            '_id': self.mid,
+            'count': entity_count,
+            'total': total_count
+        })
+
+class NameProbability(object):
+    def __init__(self, tag):
+        self.mid = 'necounts[{:}]'.format(tag)
+        self.store = Store.Get('models:' + self.mid)
+
+    def probability(self, name, entity, candidates):
+        ecs = self.store.fetch(name) or {
+            'entities': {},
+            'total': .0
+        }
+
+        if entity in ecs['entities']:
+            return ecs['entities'][entity] / float(ecs['total'])
+        
         return 1e-10
 
-        #if len(entities) == 0:
-        #    return 1.0 / len(candidates)
-        #else:
-        #    p_e_n = entities.get(entity, 0.0)
-        #    return ((1.0 / len(candidates)) + p_e_n) / (1.0 + sum(entities.get(e, 0.0) for e in candidates))
+    def is_zero(self, name):
+        return bool(self.store.fetch(name))
+
+    def create(self, name_entity_counts_iter):
+        metadata_store = Store.Get('models:meta')
         
+        log.info('Flushing existing name-entity counts...')
+        self.store.flush()
+        metadata_store.delete(self.mid)
+
+        name_count = 0
+        name_entity_count = 0
+
+        batch = []
+        batch_sz = 250000
+        for name, entity_counts in name_entity_counts_iter:
+            name_count += 1
+            name_entity_count += len(entity_counts)
+            
+            batch.append({
+                '_id': name,
+                'entities': entity_counts,
+                'total': sum(entity_counts.itervalues())
+            })
+            if len(batch) >= batch_sz:
+                self.store.save_many(batch)
+                log.debug('Stored %i name->entity counts...', name_entity_count)
+                batch = []
         
-        #if len(entities) == 0:
-        #    return 1e-20
-        #else:
-        #    p_e_n = entities.get(entity, 0.0)
-        #    return ((1.0 / len(entities)) + p_e_n) / (1.0 + sum(entities.values()))
+        if batch:
+            self.store.save_many(batch)
+            log.debug('Stored %i name-entity counts over %i names...', name_entity_count, name_count)
 
-    def normalise(self):
-        for counts in self.d.itervalues():
-            total = float(sum(counts.itervalues()))
-            for e in counts.iterkeys():
-                counts[e] /= total
-
-    def iternames(self):
-        return self.d.iterkeys()
-
-    def update(self, name, entity, score):
-        "Add score for name=>entity."
-        self.d.setdefault(name, {})[entity] = score
-
-    def write(self, path):
-        "Write model to file handle."
-        log.debug('Writing model for %i names to file: %s ...' % (len(self.d), path))
-
-        with open(path, 'wb') as fh:
-            for name, d in self.d.iteritems():
-                marshal.dump((name, d), fh)
-
-    def read(self, path):
-        "Read model from file."
-        log.debug('Loading name model from: %s ...' % path)
-
-        with open(path, 'rb') as fh:
-            while True:
-                try:
-                    name, d = marshal.load(fh)
-                    norm = self._norm(name)
-                    self.d[norm] = self._dsum(norm, d)
-                except EOFError: break
-
-    def _norm(self, name):
-        if self.lower:
-            name = name.lower()
-        return name
-
-    def _dsum(self, name, d):
-        if name in self.d:
-            c = Counter(self.d[name]) + Counter(d)
-            total = sum(c.values())
-            d = {n:v/total for n,v in c.iteritems()}
-        return d
+        metadata_store.save({
+            '_id': self.mid,
+            'name_count': name_count,
+            'name_entity_count': name_entity_count
+        })
 
 class Candidates(object):
     def __init__(self):
@@ -432,6 +417,7 @@ class mmdict(object):
     def __contains__(self, key):
         return key in self.index
 
+    @lru_cache(maxsize=20000)
     def __getitem__(self, key):
         if key not in self:
             return None

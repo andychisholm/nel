@@ -2,7 +2,7 @@
 import math
 from .feature import Feature
 from functools32 import lru_cache
-from ..model.model import Name, Entity
+from ..model import model
 
 import logging
 log = logging.getLogger()
@@ -17,25 +17,25 @@ class LogProbabilityFeature(Feature):
 @Feature.Extractable
 class EntityProbability(LogProbabilityFeature):
     """ Entity prior probability. """
-    def __init__(self, entity_model_path):
-        self.entity_model = Entity()
-        self.entity_model.read(entity_model_path)
+    def __init__(self, entity_prior_model_tag):
+        self.tag = entity_prior_model_tag
+        self.epm = model.EntityPrior(self.tag)
 
     def candidate_probability(self, doc, mention, candidate, state):
-        return self.entity_model.score(candidate.id)
+        return self.epm.prior(candidate.id)
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('entity_model_path', metavar='ENTITY_MODEL')
+        p.add_argument('entity_prior_model_tag', metavar='ENTITY_MODEL_TAG')
         p.set_defaults(featurecls=cls)
         return p
 
 @Feature.Extractable
 class NameProbability(LogProbabilityFeature):
     """ Entity given Name probability. """
-    def __init__(self, name_model_path):
-        self.name_model = Name(lower=True)
-        self.name_model.read(name_model_path)
+    def __init__(self, name_model_tag):
+        self.tag = name_model_tag
+        self.npm = model.NameProbability(self.tag)
 
     def compute_doc_state(self, doc):
         sfs_by_chain = {}
@@ -45,18 +45,20 @@ class NameProbability(LogProbabilityFeature):
             names = sorted(names, key=len, reverse=True)
             sf = None
             for name in names:
-                if name in self.name_model.d:
+                # todo: refactor - depending on the store, this can be a fairly wasteful lookup
+                if not self.npm.is_zero(name):
                     sf = name
                     break
-            sfs_by_chain[chain] = sf
+            # we take the longest non-zero name, or the longest name if all are zeros
+            sfs_by_chain[chain] = sf or names[0]
         
         return sfs_by_chain
     
     def candidate_probability(self, doc, chain, candidate, state):
-        return self.name_model.score(state[chain], candidate.id, [c.id for c in chain.candidates])
-        
+        return self.npm.probability(state[chain], candidate.id, [c.id for c in chain.candidates])
+
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('name_model_path', metavar='NAME_MODEL')
+        p.add_argument('name_model_tag', metavar='NAME_MODEL_TAG')
         p.set_defaults(featurecls=cls)
         return p
