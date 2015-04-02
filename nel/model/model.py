@@ -45,27 +45,19 @@ class EntityPrior(object):
         entity_count = 0
         total_count = 0
 
-        batch = []
-        batch_sz = 250000
-        
         log.info('Storing entity counts...')
-        for entity, count in entity_count_iter:
-            entity_count += 1
-            total_count += count
-            
-            batch.append({
-                '_id': entity,
-                'count': count
-            })
-            if len(batch) >= batch_sz:
-                self.store.save_many(batch)
-                log.debug('Stored %i entity counts...', entity_count)
-                batch = []
-        
-        if batch:
-            self.store.save_many(batch)
-            log.debug('Stored %i entity counts...', entity_count)
-        
+        with store.batched_insert(250000) as s:
+            for entity, count in entity_count_iter:
+                entity_count += 1
+                total_count += count
+                
+                s.save({
+                    '_id': entity,
+                    'count': count
+                })
+                if entity_count % 250000 == 0:
+                    log.debug('Stored %i entity counts...', entity_count)
+
         metadata_store.save({
             '_id': self.mid,
             'count': entity_count,
@@ -100,26 +92,21 @@ class NameProbability(object):
 
         name_count = 0
         name_entity_count = 0
+        with store.batched_insert(250000) as s:
+            for name, entity_counts in name_entity_counts_iter:
+                name_count += 1
+                name_entity_count += len(entity_counts)
 
-        batch = []
-        batch_sz = 250000
-        for name, entity_counts in name_entity_counts_iter:
-            name_count += 1
-            name_entity_count += len(entity_counts)
-            
-            batch.append({
-                '_id': name,
-                'entities': entity_counts,
-                'total': sum(entity_counts.itervalues())
-            })
-            if len(batch) >= batch_sz:
-                self.store.save_many(batch)
-                log.debug('Stored %i name->entity counts...', name_entity_count)
-                batch = []
-        
-        if batch:
-            self.store.save_many(batch)
-            log.debug('Stored %i name-entity counts over %i names...', name_entity_count, name_count)
+                s.save({
+                    '_id': name,
+                    'entities': entity_counts,
+                    'total': sum(entity_counts.itervalues())
+                })
+
+                if name_count % 250000 == 0:
+                    log.debug('Stored %i name->entity counts...', name_entity_count)
+
+        log.info('Stored %i name-entity counts over %i names...', name_entity_count, name_count)
 
         metadata_store.save({
             '_id': self.mid,
@@ -158,6 +145,8 @@ class Candidates(object):
 
         items_iter = entities_by_name.iteritems()
         total = len(entities_by_name)
+        
+        # todo: refactor to make use of batched inserter class
         batch_sz = 250000
         for i in xrange(0, total, batch_sz):
             log.info("Inserted %i / %i...", i, total)

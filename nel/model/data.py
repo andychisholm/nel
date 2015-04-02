@@ -32,6 +32,9 @@ class Store(object):
         for obj in obj_iter:
             self.save(obj)
 
+    def batched_inserter(self, batch_size):
+        return BatchInserter(self, batch_size)
+
     @staticmethod
     def Get(store_id):
         url = os.environ.get('NEL_DATASTORE_URI', 'mongodb://localhost')
@@ -46,6 +49,29 @@ class Store(object):
         else:
             log.error('Unsupported data store')
             raise NotImplementedError
+
+class BatchInserter(object):
+    def __init__(self, store, batch_size):
+        self.store = store
+        self.batch_size = batch_size
+        self.batch = []
+
+    def flush(self):
+        if self.batch:
+            self.store.save_many(self.batch)
+            self.batch = []
+
+    def save(self, obj):
+        self.batch.append(obj)
+        if len(self.batch) > self.batch_size:
+            self.flush()
+
+    def __enter__(self):
+        self.batch = []
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.flush()
 
 class RedisStore(Store):
     def __init__(self, namespace, url='redis://localhost'):
