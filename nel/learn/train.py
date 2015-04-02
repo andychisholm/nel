@@ -97,6 +97,10 @@ class Train(object):
         dual = penalty == 'l2' and loss == 'l1'
         model = LinearSVC(dual=dual, penalty=penalty, C=C, loss=loss)
         model.fit(X, y)
+        
+        py = model.predict(X)
+        correct = sum(1.0 for i, _y in enumerate(py) if y[i] == _y)
+        log.info('Training set pairwise performance: %.3f (%i / %i)', correct/len(y), int(correct), len(y))
 
         return model
 
