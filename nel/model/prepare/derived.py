@@ -456,8 +456,9 @@ class ExportEntityInfo(object):
         self.entity_model_tag = entity_model_tag
         self.out_path = out_path
 
-    def is_entity(self, entity_id):
-        return not entity_id.lower().endswith('(disambiguation)')
+    def is_entity(self, entity_id, description):
+        return not entity_id.lower().endswith('(disambiguation)') and \
+               not description == 'Wikipedia disambiguation page'
 
     def __call__(self):
         entity_set = marshal.load(open(self.entity_set_model_path,'r')) 
@@ -478,12 +479,13 @@ class ExportEntityInfo(object):
                 if info == None:
                     skipped += 1
                     continue
-                if not (self.include_non_entities or self.is_entity(entity_id)):
+
+                description = info['description']
+                if not (self.include_non_entities or self.is_entity(entity_id, description)):
                     filtered += 1
                     continue
-
+                
                 count = str(prior_model.count(entity_id))
-                description = info['description']
                 label = info['label']
                 row = '\t'.join([label, count, description, entity_id])+'\n'
                 f.write(row.encode('utf-8'))
