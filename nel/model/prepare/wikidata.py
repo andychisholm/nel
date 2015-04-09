@@ -7,8 +7,10 @@ from ..data import Store
 import logging
 log = logging.getLogger()
 
+R_PD_MATCH=')'
+L_PD_MATCH=' ('
 class BuildWikidataEntityDescriptions(object):
-    """ Extracts an entity->short_description store from a wikidata dump """
+    """ Extracts an entity->short_description store from a wikidata dump """    
     def __init__(self, wikidata_dump_path):
         self.wikidata_dump_path = wikidata_dump_path
 
@@ -34,18 +36,32 @@ class BuildWikidataEntityDescriptions(object):
                     try:
                         obj = json.loads(line[:-2])
                         entity = obj['sitelinks']['enwiki']['title']
-                        description = obj['descriptions']['en']['value']
                     except Exception:
                         # json.load will fail on the first and last line of the file
                         # some entities will be missing english descriptions or sitelinks
                         continue
-                    
-                    if description:
-                        desc_count += 1
-                        s.save({
-                            '_id': entity.replace(' ','_'),
-                            'description': description
-                        })
+
+                    description = obj.get('descriptions',{}).get('en',{}).get('value', '')
+                    label = obj.get('labels',{}).get('en',{}).get('value', None)
+
+                    if not label or not description:
+                        if entity.endswith(R_PD_MATCH):
+                            pd_start = entity.rfind(L_PD_MATCH)
+                            if pd_start != -1:
+                                if not label:
+                                    label = entity[:pd_start]
+                                if not description:
+                                    description = entity[pd_start+len(L_PD_MATCH):-1]
+                        if not label:
+                            label = entity
+
+                    # instance_of = obj['claims']['P31'][0]['mainsnak']['datavalue']['value']['numeric-id'] 
+                    desc_count += 1
+                    s.save({
+                        '_id': entity.replace(' ','_'),
+                        'label': label,
+                        'description': description
+                    })
 
         log.info('Done')
 
