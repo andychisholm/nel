@@ -450,10 +450,14 @@ class BuildIdfsForEntityContext(object):
 
 class ExportEntityInfo(object):
     """ Creates a tsv with entity info useful for autocompletion """
-    def __init__(self, entity_set_model_path, entity_model_tag, out_path):
+    def __init__(self, entity_set_model_path, entity_model_tag, include_non_entities, out_path):
+        self.include_non_entities = include_non_entities
         self.entity_set_model_path = entity_set_model_path
         self.entity_model_tag = entity_model_tag
         self.out_path = out_path
+
+    def is_entity(self, entity_id):
+        return not entity_id.lower().endswith('(disambiguation)')
 
     def __call__(self):
         entity_set = marshal.load(open(self.entity_set_model_path,'r')) 
@@ -462,27 +466,34 @@ class ExportEntityInfo(object):
 
         total = len(entity_set)
         skipped = 0
-
+        filtered = 0
+        log.info('Exporting entity information... (entities only=%s)', str(not self.include_non_entities))
         with open(self.out_path, 'w') as f:
             for i, entity_id in enumerate(entity_set):
                 if i % 250000 == 0:
                     log.debug('Processed %i entities...', i)
 
                 info = desc_model.get(entity_id)
+                
                 if info == None:
                     skipped += 1
                     continue
+                if not (self.include_non_entities or self.is_entity(entity_id)):
+                    filtered += 1
+                    continue
+
                 count = str(prior_model.count(entity_id))
                 description = info['description']
                 label = info['label']
                 row = '\t'.join([label, count, description, entity_id])+'\n'
                 f.write(row.encode('utf-8'))
-        log.info("Entity export complete, %i total entities, %i skipped", total, skipped)
+        log.info("Entity export complete, %i total entities, %i skipped, %i filtered", total, skipped, filtered)
 
     @classmethod
     def add_arguments(cls, p):
         p.add_argument('entity_set_model_path', metavar='ENTITY_SET_MODEL_PATH')
         p.add_argument('entity_model_tag', metavar='PRIOR_MODEL_TAG')
         p.add_argument('out_path', metavar='OUT_PATH')
+        p.add_argument('--include_non_entities', metavar='INCLUDE_NON_ENTITIES', type=bool, required=False, default=False)
         p.set_defaults(cls=cls)
         return p
