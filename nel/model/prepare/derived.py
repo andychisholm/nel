@@ -447,3 +447,42 @@ class BuildIdfsForEntityContext(object):
         p.add_argument('outpath', metavar='OUTFILE')
         p.set_defaults(cls=cls)
         return p
+
+class ExportEntityInfo(object):
+    """ Creates a tsv with entity info useful for autocompletion """
+    def __init__(self, entity_set_model_path, entity_model_tag, out_path):
+        self.entity_set_model_path = entity_set_model_path
+        self.entity_model_tag = entity_model_tag
+        self.out_path = out_path
+
+    def __call__(self):
+        entity_set = marshal.load(open(self.entity_set_model_path,'r')) 
+        prior_model = model.EntityPrior(self.entity_model_tag)
+        desc_model = model.EntityDescription()
+
+        total = len(entity_set)
+        skipped = 0
+
+        with open(self.out_path, 'w') as f:
+            for i, entity_id in enumerate(entity_set):
+                if i % 250000 == 0:
+                    log.debug('Processed %i entities...', i)
+
+                info = desc_model.get(entity_id)
+                if info == None:
+                    skipped += 1
+                    continue
+                count = str(prior_model.count(entity_id))
+                description = info['description']
+                label = info['label']
+                row = '\t'.join([label, count, description, entity_id])+'\n'
+                f.write(row.encode('utf-8'))
+        log.info("Entity export complete, %i total entities, %i skipped", total, skipped)
+
+    @classmethod
+    def add_arguments(cls, p):
+        p.add_argument('entity_set_model_path', metavar='ENTITY_SET_MODEL_PATH')
+        p.add_argument('entity_model_tag', metavar='PRIOR_MODEL_TAG')
+        p.add_argument('out_path', metavar='OUT_PATH')
+        p.set_defaults(cls=cls)
+        return p

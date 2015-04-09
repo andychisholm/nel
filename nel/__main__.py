@@ -9,7 +9,7 @@ from corpora import prepare
 from harness import harness
 from features import extract
 from learn import train
-from model.prepare import wikilinks, wikipedia, kopi, derived, wordvec, dbpedia, yago, freebase
+from model.prepare import wikilinks, wikipedia, wikidata, kopi, derived, wordvec, dbpedia, yago, freebase
 
 # not referenced explicitly but must be imported to register components via descriptors
 from features import probability, context, meta # pylint: disable=I0011,W0611
@@ -29,7 +29,8 @@ APPS = [
     train.Train,
 
     derived.BuildLinkModels,
- 
+    derived.ExportEntityInfo,
+
     wikilinks.BuildWikilinksLexicalisations,
     wikilinks.BuildWikilinksEntityContext,
     wikilinks.BuildWikilinksMentions,
