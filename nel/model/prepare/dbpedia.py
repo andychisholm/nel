@@ -1,8 +1,6 @@
-from ..model import Entity, Name
-
+from ...model import model
 
 import logging
-
 log = logging.getLogger()
 
 class BuildDbpediaLexicalisations(object):
