@@ -25,14 +25,16 @@ class EntityPrior(object):
         self.store = Store.Get('models:' + self.mid)
 
         metadata = Store.Get('models:meta').fetch(self.mid) or {}
-        self.count = metadata.get('count', 0)
+        self.entity_count = metadata.get('count', 0)
         self.total = metadata.get('total', 0)
-    
+
+    def count(self, entity):
+        item = self.store.fetch(entity) or {}
+        return item.get('count', 0)
+
     def prior(self, entity):
         "Return score for entity, default 1e-20."
-        item = self.store.fetch(entity) or {}
-        count = float(item.get('count', 0))
-
+        count = float(self.count(entity))
         return max(1e-20, count / self.total)
 
     def create(self, entity_count_iter):
@@ -46,7 +48,7 @@ class EntityPrior(object):
         total_count = 0
 
         log.info('Storing entity counts...')
-        with store.batched_insert(250000) as s:
+        with self.store.batched_inserter(250000) as s:
             for entity, count in entity_count_iter:
                 entity_count += 1
                 total_count += count
@@ -92,7 +94,7 @@ class NameProbability(object):
 
         name_count = 0
         name_entity_count = 0
-        with store.batched_insert(250000) as s:
+        with self.store.batched_inserter(250000) as s:
             for name, entity_counts in name_entity_counts_iter:
                 name_count += 1
                 name_entity_count += len(entity_counts)
