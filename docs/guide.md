@@ -58,6 +58,7 @@ The `activate` script exports a bunch of environment variables then activates th
 
 * `NEL_ROOT` - path to the cloned [nel](https://github.com/wikilinks/nel) repository
 * `NEL_MODELS` - path at which compiled linking models are stored
+* `NEL_DATASTORE_URI` - URI which identifies the backing store for models (e.g. redis, mongo or file based)
 * `NELEVAL_ROOT` - path to the cloned [neleval](https://github.com/wikilinks/neleval/) repository
 * `STANFORD_NER_ROOT` - path to the extracted [Stanford NER](http://nlp.stanford.edu/software/CRF-NER.shtml) tools
 
@@ -74,6 +75,8 @@ The `activate` script should look something like the following:
 
 export NEL_ROOT=~/nel
 export NEL_MODELS_ROOT=$NEL_ROOT/data/models
+export NEL_DATASTORE_URI='redis://localhost'
+
 export NELEVAL_ROOT=~/neleval
 export STANFORD_NER_ROOT=~/ner/stanford-ner-2014-08-27
 
