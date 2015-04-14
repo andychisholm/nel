@@ -42,7 +42,7 @@ class ServiceHarness(object):
         return Doc(text=doc['content'], id=doc['id'])
 
     def process(self, data):
-        log.info('Processing document %s...', len(data['doc']['id']))
+        log.info('Processing document %s...', data['doc']['id'])
         doc = self.linker(self.read(data['doc']))
 
         if  data['format'] == 'json':
