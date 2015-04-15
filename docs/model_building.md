@@ -37,5 +37,5 @@ dr split --in-file $WK_DOCREP_PATH -t $WK_SPLIT_PATH/wikipedia.{n:03d}.dr k 1000
 nel build-link-models $WK_SPLIT_PATH wikipedia
 
 # Entity textual context models
-nel build-ctx-models $WK_SPLIT_PATH wikipedia
+nel build-context-models $WK_SPLIT_PATH wikipedia
 ```
