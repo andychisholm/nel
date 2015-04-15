@@ -7,6 +7,8 @@ from pymongo import MongoClient
 import logging
 log = logging.getLogger()
 
+DATASTORE_URI_VAR = 'NEL_DATASTORE_URI'
+
 class Store(object):
     def fetch(self, oid):
         raise NotImplementedError
@@ -37,7 +39,7 @@ class Store(object):
 
     @staticmethod
     def Get(store_id):
-        url = os.environ.get('NEL_DATASTORE_URI', 'mongodb://localhost')
+        url = os.environ.get(DATASTORE_URI_VAR, 'mongodb://localhost')
 
         if url.startswith('mongodb'):
             log.debug("Using mongo data store for (%s)...", store_id)
