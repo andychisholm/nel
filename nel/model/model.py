@@ -13,10 +13,15 @@ import math
 import os
 import logging
 import mmap
+from time import time
+from datetime import datetime
 
 log = logging.getLogger()
 
 ENC = 'utf8'
+
+def get_timestamp():
+    return datetime.fromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
 
 class EntityPrior(object):
     """ Entity prior. """
@@ -63,7 +68,8 @@ class EntityPrior(object):
         metadata_store.save({
             '_id': self.mid,
             'count': entity_count,
-            'total': total_count
+            'total': total_count,
+            'created_at': get_timestamp()
         })
 
 class NameProbability(object):
@@ -113,8 +119,16 @@ class NameProbability(object):
         metadata_store.save({
             '_id': self.mid,
             'name_count': name_count,
-            'name_entity_count': name_entity_count
+            'name_entity_count': name_entity_count,
+            'created_at': get_timestamp()
         })
+
+class EntityDescription(object):
+    def __init__(self):
+        self.store = Store.Get('models:descriptions')
+
+    def get(self, entity):
+        return self.store.fetch(entity)
 
 class Candidates(object):
     def __init__(self):
@@ -170,6 +184,103 @@ class Redirects(object):
 
     def dict(self):
         return {r['_id']:r['target'] for r in self.store.fetch_all()}
+
+class EntityContext(object):
+    def __init__(self, tag):
+        self.tf_model = EntityTermFrequency(tag)
+        self.df_model = TermDocumentFrequency(tag)
+
+    def get_bow(self, tf_iter):
+        return {t:math.sqrt(f) * self.df_model.idf(t) for t, f in tf_iter}
+
+    def get_entity_bow(self, entity):
+        return self.get_bow(self.tf_model.get_term_counts(entity).iteritems())
+
+    def similarity(self, a, b):
+        a_sq = 1.0 * math.sqrt(sum(val * val for val in a.itervalues()))
+        b_sq = 1.0 * math.sqrt(sum(val * val for val in b.itervalues()))
+
+        # iterate over the shorter vector
+        if len(b) < len(a):
+            a, b = b, a
+
+        cossim = sum(value * b.get(index, 0.0) for index, value in a.iteritems())
+        cossim /= a_sq * b_sq
+
+        return cossim
+
+class EntityTermFrequency(object):
+    def __init__(self, tag):
+        self.mid = 'tfs[{:}]'.format(tag)
+        self.store = Store.Get('models:' + self.mid)
+
+    @lru_cache(maxsize=100000)
+    def get_term_counts(self, entity):
+        return (self.store.fetch(entity) or {}).get('tfs', {})
+
+    def create(self, entity_tfs_iterator):
+        log.info("Dropping existing tfs...")
+        self.store.flush()
+
+        entity_count = 0
+        with self.store.batched_inserter(250000) as s:
+            for entity, tfs in entity_tfs_iterator:
+                s.save({
+                    '_id': entity,
+                    'tfs': tfs
+                })
+                entity_count += 1
+                if entity_count % 250000 == 0:
+                    log.debug('Stored term counts for %i entities...', entity_count)
+
+        log.info('Stored term counts for %i entities.', entity_count)
+
+        metadata_store = Store.Get('models:meta')
+        metadata_store.save({
+            '_id': self.mid,
+            'entity_count': entity_count,
+            'created_at': get_timestamp()
+        })
+
+class TermDocumentFrequency(object):
+    def __init__(self, tag):
+        self.mid = 'df[{:}]'.format(tag)
+        self.store = Store.Get('models:' + self.mid)
+        
+        metadata_store = Store.Get('models:meta')
+        metadata = metadata_store.fetch(self.mid) or {}
+        self.total_docs = metadata.get('total_docs', 0)
+
+    @lru_cache(maxsize=500000)
+    def idf(self, term):
+        dfo = self.store.fetch(term) or {}
+        df = float(dfo.get('df', 0))
+
+        return math.log(self.total_docs / (df+1))
+
+    def create(self, total_docs, term_df_iterator):
+        log.info("Dropping existing dfs...")
+        self.store.flush()
+
+        count = 0
+        with self.store.batched_inserter(250000) as s:
+            for term, df in term_df_iterator:
+                s.save({
+                    '_id': term,
+                    'df': df
+                })
+                count += 1
+                if count % 250000 == 0:
+                    log.debug('Stored document frequencies for %i terms...', count)
+
+        log.info('Stored %i term dfs.', count)
+
+        metadata_store = Store.Get('models:meta')
+        metadata_store.save({
+            '_id': self.mid,
+            'total_docs': total_docs,
+            'created_at': get_timestamp()
+        })
 
 class EntityCooccurrence(object):
     def __init__(self, cooccurrence_counts = None, occurrence_counts = None):

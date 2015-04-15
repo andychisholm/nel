@@ -3,8 +3,11 @@ import math
 import re
 import logging
 import marshal
+import os
+import operator
 
-from collections import defaultdict,Counter
+from time import time
+from collections import defaultdict, Counter
 from schwa import dr
 from .. import model
 
@@ -17,6 +20,7 @@ from ..model import EntityOccurrence, EntityCooccurrence
 from ..model import Candidates
 
 from .util import trim_subsection_link
+from ...util import parmapper
 
 log = logging.getLogger()
 
@@ -107,7 +111,6 @@ class BuildLinkModels(object):
         nep_model = model.NameProbability(self.model_tag)
         nep_model.create(name_entity_counts.iteritems())
         nep_model = None
-        
         log.info('Done')
 
     def normalise_name(self, name):
@@ -117,6 +120,70 @@ class BuildLinkModels(object):
     def add_arguments(cls, p):
         p.add_argument('page_model_path', metavar='PAGE_MODEL_MODEL')
         p.add_argument('entity_set_model_path', metavar='ENTITY_SET_MODEL_PATH')
+        p.add_argument('model_tag', metavar='MODEL_TAG')
+        p.set_defaults(cls=cls)
+        return p
+
+class BuildContextModels(object):
+    "Build link derived models from a docrep corpus."
+    def __init__(self, docs_path, model_tag):
+        self.docs_path = docs_path
+        self.model_tag = model_tag
+
+        class Token(dr.Ann):
+            norm = dr.Field()
+        class Doc(dr.Doc):
+            name = dr.Field()
+            tokens = dr.Store(Token)
+        self.doc_schema = Doc.schema()
+
+    def process_chunk(self, path):
+        bows = []
+        with open(path,'r')  as f:
+            for doc in dr.Reader(f, self.doc_schema):
+                bows.append((doc.name, Counter(t.norm.lower() for t in doc.tokens)))
+        return bows
+
+    def iter_file_names(self):
+        for path, _, files in os.walk(self.docs_path):
+            for filename in files:
+                if filename.endswith('.dr'):
+                    yield os.path.join(path, filename)
+
+    def iter_doc_bows(self):
+        with parmapper(self.process_chunk, recycle_interval=None) as pm:
+            for _, instances in pm.consume(self.iter_file_names()):
+                for x in instances:
+                    yield x
+
+    def __call__(self):
+        log.info('Building ctx models from: %s', self.docs_path)
+        total_docs = 4850000
+        start_time = time()
+
+        dfs = defaultdict(int)
+        def process_bows():
+            for i, (name, bow) in enumerate(self.iter_doc_bows()):
+                for term in bow.iterkeys():
+                    dfs[term] += 1
+                if i % 100000 == 0:
+                    if i > 0:
+                        dps = i / (time() - start_time)
+                        eta = ((total_docs - i) / dps) / 60.0
+                    else:
+                        dps, eta = 0, 0
+                    log.info('Processed %i documents... (%.1f dps, %.1f mins)', i, dps, eta)
+                yield (name, bow)
+
+        tf_model = model.EntityTermFrequency(self.model_tag)
+        tf_model.create(process_bows())
+        df_model = model.TermDocumentFrequency(self.model_tag)
+        df_model.create(total_docs, dfs.iteritems())
+        log.info('Done')
+
+    @classmethod
+    def add_arguments(cls, p):
+        p.add_argument('docs_path', metavar='DOCS_PATH')
         p.add_argument('model_tag', metavar='MODEL_TAG')
         p.set_defaults(cls=cls)
         return p
