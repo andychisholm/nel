@@ -8,18 +8,17 @@
     },
     "candidate_generation": {
         "name": "CandidateGenerator",
-        "params": {
-        }
+        "params": {}
     },
     "features": [{
             "name": "EntityProbability",
             "params": {
-                "entity_model_path":    "/data0/linking/models/wikipedia.entity.model"
+                "entity_prior_model_tag": "wikipedia"
             }
         }, {
             "name":"NameProbability",
             "params": {
-                "name_model_path":      "/data0/linking/models/wikipedia.name.model"
+                "name_model_tag": "wikipedia"
             }
         }, {
             "name": "BoWMentionContext",
@@ -42,7 +41,8 @@
         }, {
             "name": "ClassifierScore",
             "params": {
-                "classifier_id": "reranker"
+                "classifier_id": "reranker",
+                "provider": "mongo"
             }
         }
     ],
