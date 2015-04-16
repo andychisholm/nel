@@ -1,8 +1,11 @@
 from setuptools import setup, find_packages
 
+__version__ = '0.1'
+__pkg_name__ = 'nel'
+
 setup(
-    name = 'nel',
-    version = '0.1',
+    name = __pkg_name__,
+    version = __version__,
     description = 'Named entity linker',
     packages = find_packages(),
     license = 'MIT',
