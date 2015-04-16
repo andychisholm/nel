@@ -11,10 +11,6 @@ from features import extract
 from learn import train
 from model.prepare import wikilinks, wikipedia, wikidata, kopi, derived, wordvec, dbpedia, yago, freebase
 
-# not referenced explicitly but must be imported to register components via descriptors
-from features import probability, context, meta # pylint: disable=I0011,W0611
-from corpora import conll #pylint: disable=I0011,W0611
-
 """ Logging Configuration """
 logFormat = '%(asctime)s|%(levelname)s|%(module)s|%(message)s'
 logging.basicConfig(format=logFormat)
