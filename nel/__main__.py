@@ -3,7 +3,6 @@ import argparse
 import re
 import sys
 import textwrap
-import logging
 
 from corpora import prepare
 from harness import harness
@@ -11,11 +10,8 @@ from features import extract
 from learn import train
 from model.prepare import wikilinks, wikipedia, wikidata, kopi, derived, wordvec, dbpedia, yago, freebase
 
-""" Logging Configuration """
-logFormat = '%(asctime)s|%(levelname)s|%(module)s|%(message)s'
-logging.basicConfig(format=logFormat)
+import logging
 log = logging.getLogger()
-log.setLevel(logging.DEBUG)
 
 APPS = [
     prepare.PrepareCorpus,
