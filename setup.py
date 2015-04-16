@@ -1,9 +1,8 @@
 from setuptools import setup, find_packages
-from nel import __pkg_name__, __version__
 
 setup(
-    name = __pkg_name__,
-    version = __version__,
+    name = 'nel',
+    version = '0.1',
     description = 'Named entity linker',
     packages = find_packages(),
     license = 'MIT',
