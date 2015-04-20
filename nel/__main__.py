@@ -4,11 +4,14 @@ import re
 import sys
 import textwrap
 
-from corpora import prepare
-from harness import harness
-from features import extract
-from learn import train
-from model.prepare import wikilinks, wikipedia, wikidata, kopi, derived, wordvec, dbpedia, yago, freebase
+from .corpora import prepare
+from .harness import harness
+from .features import extract
+from .learn import train
+from .model.prepare import wikilinks, wikipedia, wikidata, kopi, \
+                           dbpedia, yago, freebase, \
+                           derived, wordvec, \
+                           tac
 
 import logging
 log = logging.getLogger()
@@ -38,6 +41,8 @@ APPS = [
     derived.BuildEntityCooccurrenceFromOccurrence,
     derived.BuildCandidateModel,
     
+    tac.BuildTacRedirects,
+
     wordvec.BuildWordVectors,
     wordvec.BuildEntityEmbeddings,
     
