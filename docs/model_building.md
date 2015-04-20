@@ -21,6 +21,11 @@ wget http://dumps.wikimedia.org/enwiki/latest/$WK_DUMP_FN
 bzcat $WK_DUMP_FN|python WikiExtractor.py -cb 500k -l -s -o $WK_PLAIN_PATH
 ```
 
+### Extract Redirects
+```
+nel build-wikipedia-redirects $WK_DUMP_FN
+```
+
 ### Convert to Docrep
 ```
 nel build-wikipedia-docrep $WK_PLAIN_PATH $WK_DOCREP_PATH
