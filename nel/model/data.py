@@ -134,7 +134,7 @@ class MongoStore(Store):
     def save(self, obj):
         self.collection.save(obj)        
    
-    def save_many(seld, obj_iter):
+    def save_many(self, obj_iter):
         self.collection.insert(obj_iter)    
 
     def flush(self):
