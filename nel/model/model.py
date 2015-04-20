@@ -197,6 +197,9 @@ class EntityContext(object):
         return self.get_bow(self.tf_model.get_term_counts(entity).iteritems())
 
     def similarity(self, a, b):
+        if not a or not b:
+            return 0.0
+
         a_sq = 1.0 * math.sqrt(sum(val * val for val in a.itervalues()))
         b_sq = 1.0 * math.sqrt(sum(val * val for val in b.itervalues()))
 
