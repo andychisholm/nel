@@ -2,53 +2,70 @@
 import os
 import re
 import six
-import logging
 import datetime
 import bz2
 import HTMLParser
 import urllib
-import marshal
 
 from time import time
 from schwa import dr, tokenizer
 from ...util import parmapper
+from ..model import Redirects
 
+import logging
 log = logging.getLogger()
 
 class BuildWikipediaRedirects(object):
-    "Build redirect model from wikipedia-redirect tsv."
-    def __init__(self, inpath, outpath):
-        self.in_path = inpath
-        self.out_path = outpath
+    """ Build redirect model from comprssed wikipedia-dump """
+    def __init__(self, wikipedia_dump_path, model_tag):
+        self.wikipedia_dump_path = wikipedia_dump_path
+        self.model_tag = model_tag
         self.html_parser = HTMLParser.HTMLParser()
 
     def __call__(self):
-        log.debug('Building redirect model from file: %s' % self.in_path)
+        log.info('Building redirect model from: %s' % self.wikipedia_dump_path)
+        Redirects(self.model_tag).create(self.iter_mappings())
+        log.info('Done.')
 
-        redirects = {}
-        with open(self.in_path, 'r') as f:
-            for i, l in enumerate(f):
-                if i % 100000 == 0:
-                    log.info('Processed %i redirects...' % i)
+    def iter_mappings(self):
+        """ Based on http://code.google.com/p/wikipedia-redirect/ """
+        WK_TITLE_LINE_BEGIN = "    <title>"
+        WK_TITLE_LINE_END = "</title>\n"
+        WK_REDIRECT_LINE = "    <redirect"
+        WK_TEXT_LINE = "      <text xml"
 
-                parts = urllib.unquote(l).decode('utf-8').strip().split('\t')
-                if len(parts) == 2:
-                    source, target = (self.normalise(t) for t in parts)
-                    redirects[source] = target
-                
-        log.debug('Writing redirect model to file: %s' % self.out_path)
-        with open(self.out_path, 'wb') as f:
-            marshal.dump(redirects, f)
+        title_line = None
+        redirect = False
+        with bz2.BZ2File(self.wikipedia_dump_path, 'r') as f:
+            for line in f:
+                line = line.decode('utf-8')
+                if line.startswith(WK_TITLE_LINE_BEGIN):
+                    title_line = line
+                    redirect = False
+                elif line.startswith(WK_REDIRECT_LINE):
+                    redirect = True
+                elif redirect and line.startswith(WK_TEXT_LINE):
+                    start = line.find('[[', len(WK_TEXT_LINE))
+                    end = line.find(']]', start)
+                    target = self.normalise(line[start+2:end])
+                    source = self.normalise(title_line[len(WK_TITLE_LINE_BEGIN):-len(WK_TITLE_LINE_END)])
+                    redirect = False
+                    if self.valid_source(source):
+                        yield source, target
 
-        log.debug('Done...')
+    def valid_source(self, source):
+        return not source.startswith("Wikipedia:") and \
+               not source.startswith("Template:") and \
+               not source.startswith("Portal:") and \
+               not source.startswith("List of ")
 
     def normalise(self, title):
         return self.html_parser.unescape(title).replace(' ', '_')
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('inpath', metavar='REDIRECT_TSV')
-        p.add_argument('outpath', metavar='REDIRECT_MODEL')
+        p.add_argument('wikipedia_dump_path', metavar='WIKIDUMP_PATH')
+        p.add_argument('--model_tag', default='wikipedia', required=False, metavar='REDIRECT_MODEL_TAG')
         p.set_defaults(cls=cls)
         return p
 
