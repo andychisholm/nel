@@ -1,7 +1,7 @@
 import re
 
 from collections import defaultdict
-from .prepare import PrepareCorpus  
+from .prepare import PrepareCorpus
 from ..doc import Doc, Candidate, Chain, Mention
 from ..model import model
 from ..process import tag
@@ -39,7 +39,7 @@ class ConllPrepare(object):
         redirects = model.Redirects()
         candidates = model.Candidates()
 
-        log.info('Preparing documents...')
+        log.info('Preparing conll documents...')
         for doc, conll_tags in self.iter_docs(self.in_path, self.doc_predicate):
             mentions = []
             for gold_entity, (start, end) in conll_tags:
@@ -50,7 +50,9 @@ class ConllPrepare(object):
 
             chains = tag.Tagger.cluster_mentions(mentions)
             unique_chains = []
-    
+
+            # join chains with the same gold standard resolution, split chains with different gold resolution
+            # this requires gold annot information so is only valid if building the train set or isolating disambiguation performance
             for chain in chains:
                 mbr = defaultdict(list)
                 for m in chain.mentions:
@@ -126,7 +128,7 @@ class ConllPrepare(object):
         elif 'testb' in doc_id:
             return 'test' 
         return 'train'
-    
+
     @classmethod
     def add_arguments(cls, p):
         p.add_argument('conll_data_path', metavar='CONLL_DATA')

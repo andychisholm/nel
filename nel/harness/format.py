@@ -1,4 +1,5 @@
 import json
+from HTMLParser import HTMLParser
 from re import findall, match, DOTALL
 
 markdown_characters = u"\\`*_{}[]()#+-.!"
@@ -81,6 +82,61 @@ def markdown_to_whitespace(markdown_txt):
 
     # remove special unicode characters
     return normalize_special_characters(resu)
+
+class MarkupStripper(HTMLParser):
+    def __init__(self):
+        self.reset()
+        self._pd_char = ' '
+        self._pd = []
+        self._pd_len = 0
+        self._line_offsets = [0]
+
+    def feed_data(self, data):
+        offset = len(self.rawdata)
+
+        while True:
+            offset = data.find('\n', offset)
+            if offset != -1:
+                offset += 1
+                self._line_offsets.append(offset)
+            else:
+                break
+
+        self.feed(data)
+
+    def get_raw_offset(self):
+        return self._line_offsets[self.lineno-1] + self.offset
+
+    def append_data(self, data):
+        self._pd.append(data)
+        self._pd_len += len(data)
+
+    def append_padding(self):
+        offset = self.get_raw_offset()
+        if self._pd_len != offset:
+            self.append_data(self._pd_char * (offset - self._pd_len))
+
+    def handle_entityref(self, name):
+        self.append_data('&'+name+';')
+
+    def handle_charref(self, ref):
+        self.append_data('&#'+ref+';')
+
+    def handle_data(self, data):
+        self.append_padding()
+        self.append_data(data)
+
+    def handle_endtag(self, tag):
+        self.append_padding()
+
+    def get_padded_data(self):
+        self.append_padding()
+        return ''.join(self._pd)
+
+def markup_to_whitespace(ml):
+    parser = MarkupStripper()
+    parser.feed_data(ml)
+    return parser.get_padded_data()
 
 def to_neleval(doc):
     default_probability = 1.0
