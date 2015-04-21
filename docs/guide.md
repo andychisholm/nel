@@ -40,16 +40,11 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
 # Installation
 
-## Fetch Repo(s)
+## Fetch the repo
 
 Fetch the linker **(Required)**:
 ```
 git clone https://github.com/wikilinks/nel.git
-```
-
-Fetch the eval tool **(Optional)**:
-```
-git clone https://github.com/wikilinks/neleval.git
 ```
 
 ## Update Environment Paths
@@ -57,17 +52,9 @@ git clone https://github.com/wikilinks/neleval.git
 The `activate` script exports a bunch of environment variables then activates the python virtual environment.
 
 * `NEL_ROOT` - path to the cloned [nel](https://github.com/wikilinks/nel) repository
-* `NEL_MODELS` - path at which compiled linking models are stored
+* `NEL_MODELS_ROOT` - path at which compiled linking models are stored
 * `NEL_DATASTORE_URI` - URI which identifies the backing store for models (e.g. redis, mongo or file based)
-* `NELEVAL_ROOT` - path to the cloned [neleval](https://github.com/wikilinks/neleval/) repository
 * `STANFORD_NER_ROOT` - path to the extracted [Stanford NER](http://nlp.stanford.edu/software/CRF-NER.shtml) tools
-
-Following on from above:
-```
-cd nel
-mkdir -p data/models
-vim activate
-```
 
 The `activate` script should look something like the following:
 ```
@@ -77,7 +64,6 @@ export NEL_ROOT=~/nel
 export NEL_MODELS_ROOT=$NEL_ROOT/data/models
 export NEL_DATASTORE_URI='redis://localhost'
 
-export NELEVAL_ROOT=~/neleval
 export STANFORD_NER_ROOT=~/ner/stanford-ner-2014-08-27
 
 . ve/bin/activate
@@ -86,6 +72,7 @@ export STANFORD_NER_ROOT=~/ner/stanford-ner-2014-08-27
 ## Setup the Virtual Environment
 
 ```
+cd nel
 virtualenv ve
 . activate
 pip install -r requirements.txt

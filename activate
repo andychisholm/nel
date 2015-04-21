@@ -5,7 +5,6 @@ export NEL_ROOT=~/repos/nel
 export NEL_MODELS_ROOT=/data0/linking/models
 export NEL_DATASTORE_URI='redis://localhost'
 
-export NELEVAL_ROOT=~/repos/neleval
 export STANFORD_NER_ROOT=/data0/linking/ner/stanford-ner-2014-08-27
 
 . ve/bin/activate

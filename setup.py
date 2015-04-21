@@ -33,7 +33,8 @@ setup(
         "scipy",
         "six",
         "thrift",
-        "wsgiref"
+        "wsgiref",
+        "neleval"
     ],
     test_suite = __pkg_name__ + '.test'
 )

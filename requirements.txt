@@ -16,3 +16,4 @@ scipy==0.15.1
 six==1.9.0
 thrift==0.9.2
 wsgiref==0.1.2
+git+http://github.com/wikilinks/neleval.git#egg=NEL

@@ -89,13 +89,11 @@ if $RUN_EVAL; then
         --ranker $LINKING_FEATURE \
         > $OUTPUT_PATH/system.test.tsv
 
-    pushd $NELEVAL_ROOT > /dev/null
-    ./nel evaluate \
+    neleval evaluate \
         -m strong_mention_match \
         -m strong_link_match \
         -m entity_match \
         -f tab \
         -g $OUTPUT_PATH/gold.test.tsv \
         $OUTPUT_PATH/system.test.tsv
-    popd > /dev/null
 fi
