@@ -38,8 +38,8 @@ class Store(object):
         return BatchInserter(self, batch_size)
 
     @staticmethod
-    def Get(store_id):
-        url = os.environ.get(DATASTORE_URI_VAR, 'mongodb://localhost')
+    def Get(store_id, url = None):
+        url = url or os.environ.get(DATASTORE_URI_VAR, 'mongodb://localhost')
 
         if url.startswith('mongodb'):
             log.debug("Using mongo data store for (%s)...", store_id)
