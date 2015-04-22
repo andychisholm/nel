@@ -1,6 +1,6 @@
 import os
 import redis
-import json
+import ujson as json
 
 from pymongo import MongoClient
 
