@@ -174,16 +174,41 @@ class Candidates(object):
         log.info("Done.")
 
 class Redirects(object):
-    def __init__(self):
-        from .data import MongoStore
-        self.store = MongoStore('models','redirects') #Store.Get('models:redirects')
-    
+    def __init__(self, tag):
+        self.mid = 'redirects[{:}]'.format(tag)
+        self.store = Store.Get('models:' + self.mid)
+
     def map(self, entity):
         mapping = self.store.fetch(entity)
         return mapping['target'] if mapping else entity
 
     def dict(self):
         return {r['_id']:r['target'] for r in self.store.fetch_all()}
+
+    def create(self, source_target_iter):
+        log.info("Dropping existing redirect set (%s)...", self.mid)
+        self.store.flush()
+
+        log.info("Processing mappings...")
+        count = 0
+        with self.store.batched_inserter(250000) as s:
+            for source, target in source_target_iter:
+                count += 1
+                s.save({
+                    '_id': source,
+                    'target': target
+                })
+                if count == 10000 or count % 250000 == 0:
+                    log.debug('Stored %i redirect mappings...', count)
+
+        log.info('Stored %i redirects...', count)
+
+        metadata_store = Store.Get('models:meta')
+        metadata_store.save({
+            '_id': self.mid,
+            'total_redirects': count,
+            'created_at': get_timestamp()
+        })
 
 class EntityContext(object):
     def __init__(self, tag):
