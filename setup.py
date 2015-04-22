@@ -36,5 +36,8 @@ setup(
         "wsgiref",
         "neleval"
     ],
+    dependency_links = [
+        "git+http://github.com/wikilinks/neleval.git#egg=NEL"
+    ],
     test_suite = __pkg_name__ + '.test'
 )
