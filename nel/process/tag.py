@@ -113,7 +113,7 @@ class StanfordTagger(Tagger):
             indexes.append(len(tokens)-1)
 
         tags = []
-        max_sz = 2000
+        max_sz = 1000
         s = 0
         e = bisect_left(indexes, max_sz, lo=s)-1
         while True:
