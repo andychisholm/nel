@@ -175,9 +175,9 @@ class FragmentTokenizer(object):
         assert isinstance(text, six.text_type)
         offset = len(self.doc.tokens)
         self.tokenizer.tokenize(text.encode(ENC), dest=self)
-        self.mark_between(text.encode(ENC), self.doc.tokens[offset:], link_spans)
+        self.mark_between(text.encode(ENC), self.doc.tokens[offset:], offset, link_spans)
 
-    def mark_between(self, text, tokens, links):
+    def mark_between(self, text, tokens, offset, links):
         prev_stop = 0
 
         current_link_tok_start = None
@@ -197,7 +197,7 @@ class FragmentTokenizer(object):
                     _, anchor, target = current_link
 
                     self.doc.links.append(Link(
-                        span=slice(current_link_tok_start, i+1),
+                        span=slice(offset+current_link_tok_start, offset+i+1),
                         anchor=anchor,
                         target=target))
 
@@ -383,8 +383,7 @@ class BuildWikipediaDocrep(object):
                     if i == 10000 or (i % 100000 == 0 and i > 0):
                         dps = (i+1)/float(time() - start_time)
                         eta = datetime.timedelta(seconds=int(WK_PAGES_EST / dps))
-                        log.info('Processed %i documents... %.2f d/s (eta: %s)', i, dps, eta)
-                        
+                        log.info('Processed %i documents... %.2f d/s (eta: %s)', i, dps, eta) 
                     writer.write(doc)
             except:
                 log.error('Failed on doc: %i', i)
