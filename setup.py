@@ -37,7 +37,7 @@ setup(
         "neleval"
     ],
     dependency_links = [
-        "git+http://github.com/wikilinks/neleval.git#egg=NEL"
+        "http://github.com/wikilinks/neleval/tarball/master#egg=neleval-v2.0.0"
     ],
     test_suite = __pkg_name__ + '.test'
 )
