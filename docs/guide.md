@@ -105,3 +105,10 @@ Example: [nel/config/sample.config.json](https://github.com/wikilinks/nel/blob/m
 ```
 ./scripts/linker_svc foo/bar/config.json
 ```
+
+# Offline Evaluation
+
+## Install the eval tool
+```
+git+http://github.com/wikilinks/neleval.git#egg=neleval
+```

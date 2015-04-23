@@ -33,11 +33,7 @@ setup(
         "scipy",
         "six",
         "thrift",
-        "wsgiref",
-        "neleval"
-    ],
-    dependency_links = [
-        "http://github.com/wikilinks/neleval/tarball/master#egg=neleval-v2.0.0"
+        "wsgiref"
     ],
     test_suite = __pkg_name__ + '.test'
 )
