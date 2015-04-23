@@ -5,6 +5,7 @@ import logging
 import marshal
 import os
 import operator
+import unicodedata
 
 from time import time
 from collections import defaultdict, Counter
@@ -524,8 +525,10 @@ class ExportEntityInfo(object):
         self.out_path = out_path
 
     def is_entity(self, entity_id, description):
-        return not entity_id.lower().endswith('(disambiguation)') and \
-               not description == 'Wikipedia disambiguation page'
+        return not entity_id.strip().lower().endswith('(disambiguation)')
+
+    def normalise_label(self, label):
+        return unicodedata.normalize('NFKD', label).encode('ascii','ignore')
 
     def __call__(self):
         entity_set = marshal.load(open(self.entity_set_model_path,'r')) 
@@ -553,7 +556,7 @@ class ExportEntityInfo(object):
                     continue
                 
                 count = str(prior_model.count(entity_id))
-                label = info['label']
+                label = self.normalise_label(info['label'])
                 row = '\t'.join([label, count, description, entity_id])+'\n'
                 f.write(row.encode('utf-8'))
         log.info("Entity export complete, %i total entities, %i skipped, %i filtered", total, skipped, filtered)
