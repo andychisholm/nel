@@ -133,7 +133,8 @@ class StanfordTagger(Tagger):
                 e = bisect_left(indexes, indexes[s]+max_sz, lo=s)-1
 
         if len(tags) != len(tokens):
-            raise Exception('Tokenisation error')
+            msg = 'Tokenisation error ({:}): #tags({:}) != #toks({:})'.format(doc.id, len(tags), len(tokens))
+            raise Exception(msg)
         for i, (txt, tag) in enumerate(izip(tokens,tags)):
             if tag != last:
                 if last != 'O':
