@@ -123,12 +123,41 @@ class NameProbability(object):
             'created_at': get_timestamp()
         })
 
-class EntityDescription(object):
-    def __init__(self):
-        self.store = Store.Get('models:descriptions')
+class Entities(object):
+    def __init__(self, tag):
+        self.mid = 'entities[{:}]'.format(tag)
+        self.store = Store.Get('models:' + self.mid)
 
     def get(self, entity):
         return self.store.fetch(entity)
+
+    def create(self, iter_entities):
+        metadata_store = Store.Get('models:meta')
+
+        log.info('Flushing existing entities...')
+        self.store.flush()
+        metadata_store.delete(self.mid)
+
+        with self.store.batched_inserter(250000) as s:
+            entity_count = 0
+            for eid, label, description in iter_entities:
+                s.save({
+                    '_id': eid,
+                    'label': label,
+                    'description': description
+                })
+
+                entity_count += 1
+                if entity_count % 250000 == 0:
+                    log.debug('Stored %i entities...', entity_count)
+
+        log.info('Stored %i entities', entity_count)
+
+        metadata_store.save({
+            '_id': self.mid,
+            'entity_count': entity_count,
+            'created_at': get_timestamp()
+        })
 
 class Candidates(object):
     def __init__(self):
