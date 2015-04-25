@@ -394,3 +394,71 @@ class BuildWikipediaDocrep(object):
         p.add_argument('outpath', metavar='OUTFILE')
         p.set_defaults(cls=cls)
         return p
+
+class BuildWikipediaDisambiguationDescriptions(object):
+    " Build short disambiguating description for wikipedia entities"
+    def __init__(self, page_model_path):
+        self.page_model_path = page_model_path
+
+    def __call__(self):
+        for entity, description in self.iter_entity_descriptions():
+            pass # todo: something!
+
+    def iter_entity_descriptions(self):
+        class Token(dr.Ann):
+            norm = dr.Field()
+
+        class Sentence(dr.Ann):
+            span = dr.Slice(Token)
+
+        class Link(dr.Ann):
+            span = dr.Slice(Token)
+            anchor = dr.Field()
+            target = dr.Field()
+
+        class Doc(dr.Doc):
+            name = dr.Field()
+            tokens = dr.Store(Token)
+            links = dr.Store(Link)
+            sentences = dr.Store(Sentence)
+
+        num_descriptions = 0
+        with open(self.page_model_path,'r') as f:
+            reader = dr.Reader(f, Doc.schema())
+            for i, doc in enumerate(reader):
+                if i % 100000 == 0:
+                    log.info('Processed %i documents... (%i descriptions)', i, num_descriptions)
+                if '(disambiguation)' in doc.name:
+                    links_by_offset = {l.span.start:l for l in doc.links}
+                    sents_by_offset = {s.span.start:s for s in doc.sentences if s.span.start in links_by_offset}
+
+                    for offset, sentence in sents_by_offset.iteritems():
+                        link = links_by_offset[offset]
+                        dsc = [t.norm for t in doc.tokens[link.span.stop:sentence.span.stop]]
+
+                        if dsc and dsc[0] == ',':
+                            dsc.pop(0)
+                        if dsc and dsc[0] == 'is':
+                            dsc.pop(0)
+                        if dsc and dsc[0] == 'a':
+                            dsc.pop(0)
+                        if dsc and dsc[-1] == '.':
+                            dsc.pop()
+
+                        dsc = ' '.join(dsc).strip()
+                        dsc = dsc.replace(" 's ", "'s ")
+                        dsc = dsc.replace(' , ', ', ')
+                        dsc = dsc.replace('`` ', '"')
+                        dsc = dsc.replace(" ''", '"')
+                        dsc = dsc.replace('( ', '(')
+                        dsc = dsc.replace(' )', ')')
+
+                        if dsc and '(disambiguation)' not in dsc:
+                            num_descriptions += 1
+                            yield link.target, dsc
+
+    @classmethod
+    def add_arguments(cls, p):
+        p.add_argument('page_model_path', metavar='PAGE_MODEL_MODEL')
+        p.set_defaults(cls=cls)
+        return p

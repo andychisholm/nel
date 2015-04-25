@@ -52,8 +52,8 @@ class BuildEntitySet(object):
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('page_model_path', metavar='PAGE_MODEL_MODEL')
-        p.add_argument('entity_set_model_path', metavar='ENTITY_SET_MODEL_MODEL')
+        p.add_argument('page_model_path', metavar='PAGE_MODEL')
+        p.add_argument('entity_set_model_path', metavar='ENTITY_SET_MODEL')
         p.set_defaults(cls=cls)
         return p
 
@@ -513,52 +513,5 @@ class BuildIdfsForEntityContext(object):
     def add_arguments(cls, p):
         p.add_argument('inpath', metavar='INFILE')
         p.add_argument('outpath', metavar='OUTFILE')
-        p.set_defaults(cls=cls)
-        return p
-
-class ExportEntityInfo(object):
-    """ Exports a tsv file with entity info useful in autocompletion """
-    def __init__(self, entities_model_tag, entity_prior_model_tag, threshold, out_path):
-        self.entities_model_tag = entities_model_tag
-        self.entity_prior_model_tag = entity_prior_model_tag
-        self.entity_prior_threshold = threshold
-        self.out_path = out_path
-
-    def normalise_label(self, label):
-        return unicodedata.normalize('NFKD', label).encode('ascii','ignore')
-
-    def __call__(self):
-        entities_model = model.Entities(self.entities_model_tag)
-        prior_model = model.EntityPrior(self.entity_prior_model_tag)
-
-        total = 0
-        filtered = 0
-        missing_description = 0
-        log.info('Exporting entity information...')
-        with open(self.out_path, 'w') as f:
-            for i, (eid, label, description) in enumerate(entities_model.iter_entities()):
-                if i % 250000 == 0:
-                    log.debug('Processed %i entities...', i)
-
-                count = prior_model.count(eid)
-                if count < self.entity_prior_threshold:
-                    filtered += 1
-                    continue
-
-                if not description:
-                    missing_description += 1
-
-                label = self.normalise_label(label)
-                row = '\t'.join([label, str(count), description, eid])+'\n'
-                f.write(row.encode('utf-8'))
-
-        log.info("Completed export of %i entities (%i filtered, %i missing description)", total, filtered, missing_description)
-
-    @classmethod
-    def add_arguments(cls, p):
-        p.add_argument('entities_model_tag', metavar='ENTITIES_MODEL_TAG')
-        p.add_argument('entity_prior_model_tag', metavar='PRIOR_MODEL_TAG')
-        p.add_argument('out_path', metavar='OUT_PATH')
-        p.add_argument('--threshold', metavar='ENTITY_COUNT_THRESHOLD', type=int, default=1, required=False)
         p.set_defaults(cls=cls)
         return p

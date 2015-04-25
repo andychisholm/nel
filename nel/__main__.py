@@ -10,7 +10,7 @@ from .features import extract
 from .learn import train
 from .model.prepare import wikilinks, wikipedia, wikidata, kopi, \
                            dbpedia, yago, freebase, \
-                           derived, wordvec, \
+                           derived, wordvec, export, \
                            tac
 
 import logging
@@ -23,17 +23,25 @@ APPS = [
     extract.ExtractFeature,
     train.Train,
 
-    derived.BuildLinkModels,
-    derived.ExportEntityInfo,
+    export.ExportEntityInfo,
+    export.ExportContextTrainingSet,
 
     wikilinks.BuildWikilinksLexicalisations,
     wikilinks.BuildWikilinksEntityContext,
     wikilinks.BuildWikilinksMentions,
+
     wikipedia.BuildWikipediaDocrep,
     wikipedia.BuildWikipediaRedirects,
     wikipedia.BuildWikiHitCounts,
+    wikipedia.BuildWikipediaDisambiguationDescriptions,
+
+    wikidata.BuildWikidataEntitySet,
+    wikidata.BuildWikidataRedirects,
+
     kopi.BuildKopiWikiEntityContext,
     
+    derived.BuildLinkModels,
+    derived.BuildContextModels,
     derived.BuildEntitySet,
     derived.BuildIdfsForEntityContext,
     derived.BuildOccurrenceFromMentions,
