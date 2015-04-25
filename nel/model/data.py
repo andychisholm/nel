@@ -141,4 +141,4 @@ class MongoStore(Store):
         self.collection.drop()
 
     def delete(self, oid):
-        return self.collection.drop({'_id':oid})
+        self.collection.delete_one({'_id':oid})
