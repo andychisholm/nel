@@ -131,6 +131,10 @@ class Entities(object):
     def get(self, entity):
         return self.store.fetch(entity)
 
+    def iter_entities(self):
+        for entity in self.store.fetch_all():
+            yield entity['_id'], entity.get('label', ''), entity.get('description', '')
+
     def create(self, iter_entities):
         metadata_store = Store.Get('models:meta')
 
