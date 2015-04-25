@@ -162,12 +162,20 @@ class BuildWikidataEntitySet(object):
         for node in self.included_nodes:
             node_count = 0
             for eid in self.iter_leaves(relation_graph, node, self.excluded_nodes):
-                included_entities.add(eid)
-                node_count += 1
+                if eid in entities:
+                    included_entities.add(eid)
+                    node_count += 1
             log.debug("Total = %i entities after merging %i derived from Q%i", len(included_entities), node_count, node)
 
+        # there seem to be a few minors errors with wikidata sitelinks where multiple wikidata
+        # items map to the same wikipedia entity, e.g. 671315 and 19371531 both map to 'Helmeringhausen'
+        # no nice way to resolve these, so just remap the dict on wikipedia id to blow away the dupes
+        entities = {e[0]:e for k,e in entities.iteritems() if k in included_entities}
+        if len(entities) != len(included_entities):
+            log.warn("Filtered %i entities mapping to more than one wikidata item...", len(included_entities) - len(entities))
+
         entity_model = Entities(self.model_tag)
-        entity_model.create(e for eid, e in entities.iteritems() if eid in included_entities)
+        entity_model.create(entities.itervalues())
 
     def iter_leaves(self, graph, root, excluded = None):
         # tracks visited nodes; excludes nodes from traversal if pre-populated
@@ -189,7 +197,7 @@ class BuildWikidataEntitySet(object):
     @classmethod
     def add_arguments(cls, p):
         p.add_argument('wikidata_dump_path', metavar='WIKIDATA_DUMP_PATH')
-        p.add_argument('model_tag', metavar='ENTITIES_MODEL_TAG')
+        p.add_argument('--model_tag', metavar='ENTITIES_MODEL_TAG', required=False, default='wikipedia')
         p.add_argument('--include', metavar='INCLUDE_NODE', type=int, action='append')
         p.add_argument('--exclude', metavar='EXCLUDE_NODE', type=int, action='append')
         p.set_defaults(cls=cls)
