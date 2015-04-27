@@ -42,6 +42,7 @@ class ExportEntityInfo(object):
                     filtered += 1
                     continue
 
+                total += 1
                 if not description:
                     missing_description += 1
 

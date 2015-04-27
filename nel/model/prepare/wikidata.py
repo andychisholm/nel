@@ -11,7 +11,7 @@ log = logging.getLogger()
 def iter_wikidata_items(dump_path):
     # used to estimate runtime, given one json item per line
     # we can guess this via: zcat dump.json.gz|wc -l
-    EST_DESC_TOTAL = 17272576
+    EST_DESC_TOTAL = 17637170
 
     start_time = time()
     with gzip.open(dump_path, 'r') as gzf:
@@ -146,7 +146,7 @@ class BuildWikidataEntitySet(object):
                         relation_graph[obj].append(sub)
 
                     relation_count += 1
-                    if relation_count % 1000000 == 0:
+                    if relation_count % 5000000 == 0:
                         log.info('Processed %i relation triples...', relation_count)
 
                 # extract entity info if this is a wikipedia entity
@@ -154,18 +154,28 @@ class BuildWikidataEntitySet(object):
                 if entity:
                     entity_count += 1
                     entities[wikidata_id] = entity
-                    if entity_count % 250000 == 0:
+                    if entity_count % 500000 == 0:
                         log.info('Processed %i entities...', entity_count)
 
-        log.info('Filtering %i entities...', entity_count)
+        log.info('Building entity set over %i possible entities...', entity_count)
+        
         included_entities = set()
         for node in self.included_nodes:
             node_count = 0
-            for eid in self.iter_leaves(relation_graph, node, self.excluded_nodes):
+            for eid in self.iter_leaves(relation_graph, node):
                 if eid in entities:
                     included_entities.add(eid)
                     node_count += 1
-            log.debug("Total = %i entities after merging %i derived from Q%i", len(included_entities), node_count, node)
+            log.debug("Total = %i entities after including %i derived from Q%i", len(included_entities), node_count, node)
+
+        for node in self.excluded_nodes:
+            node_count = 0
+            for eid in self.iter_leaves(relation_graph, node):
+                if eid in included_entities:
+                    included_entities.remove(eid)
+                    node_count += 1
+            log.debug("Total = %i entities after excluding %i derived from Q%i", len(included_entities), node_count, node)
+
 
         # there seem to be a few minors errors with wikidata sitelinks where multiple wikidata
         # items map to the same wikipedia entity, e.g. 671315 and 19371531 both map to 'Helmeringhausen'
