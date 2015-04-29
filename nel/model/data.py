@@ -1,7 +1,9 @@
 import os
 import redis
+import re
 import ujson as json
 
+from itertools import islice
 from pymongo import MongoClient
 
 import logging
@@ -23,6 +25,9 @@ class Store(object):
         raise NotImplementedError
 
     def fetch_all(self):
+        raise NotImplementedError
+
+    def iter_ids(self):
         raise NotImplementedError
 
     # naive bulk get/set methods expected to be overridden
@@ -79,10 +84,13 @@ class RedisStore(Store):
     def __init__(self, namespace, url='redis://localhost'):
         self.kvs = redis.from_url(url)
         self.ns = namespace
-        self.fmt = json # msgpack, pickle
+        self.fmt = json
 
     def to_key(self, oid):
         return self.ns + ':' + oid
+
+    def to_oid(self, key):
+        return key[len(self.ns)+1:]
 
     def fetch(self, oid):
         key = self.to_key(oid)
@@ -90,8 +98,17 @@ class RedisStore(Store):
         return self.deserialise(data) if data != None else None
 
     def fetch_all(self):
-        for data in self.kvs.mget(self.keys()):
-            yield self.deserialise(data)
+        keys = self.keys()
+        keys_iter = islice(keys, None)
+        if keys:
+            batch_sz = 100000
+            for _ in xrange(0, len(keys), batch_sz):
+                for data in self.kvs.mget(islice(keys_iter, batch_sz)):
+                    yield self.deserialise(data)
+
+    def iter_ids(self):
+        for key in self.keys():
+            yield self.to_oid(key)
 
     def save(self, obj):
         key = self.to_key(obj['_id'])
@@ -113,7 +130,7 @@ class RedisStore(Store):
         self.kvs.delete(self.to_key(oid))
 
     def keys(self):
-        return self.kvs.keys(self.to_key('*'))
+        return self.kvs.keys(re.escape(self.to_key('')) + '*')
 
     def deserialise(self, data):
         return self.fmt.loads(data)
@@ -130,6 +147,10 @@ class MongoStore(Store):
 
     def fetch_all(self):
         return self.collection.find()
+
+    def iter_ids(self):
+        for obj in self.collection.find({}, {'_id':True}):
+            yield obj['_id']
 
     def save(self, obj):
         self.collection.save(obj)        
