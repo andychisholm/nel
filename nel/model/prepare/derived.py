@@ -267,16 +267,19 @@ def iter_common_lemma_names():
                 yield name
 
 class BuildCandidateModel(object):
-    "Builds an alias model from a name probability model."
-    def __init__(self, alias_model_path, name_model_path, title_model_path):
-        self.alias_model_path = alias_model_path
-        self.name_model_path = name_model_path
-        
-        self.title_model_path = title_model_path
+    "Builds a model mapping aliases to entites for candidate generation"
+    def __init__(self, entities_model_tag, redirect_model_tag, name_model_tag, model_tag):
+        self.name_model_tag = name_model_tag
+        self.model_tag = model_tag
+
         self.underscores_re = re.compile('_+')
 
-        log.info('Loading redirect mapping...')
-        self.redirects = Redirects().dict()
+        log.info('Pre-fetching redirect mappings...')
+        self.redirects = Redirects(redirect_model_tag).dict()
+
+        log.info('Pre-fetching kb entity set...')
+        self.entities_model = model.Entities(entities_model_tag)
+        self.entity_set = set(self.redirects.get(e,e) for e in self.entities_model.iter_ids())
  
     def convert_title_to_name(self, entity):
         # strip parts after a comma
@@ -295,43 +298,52 @@ class BuildCandidateModel(object):
         return self.underscores_re.sub(' ', entity)
     
     def iter_entity_aliases(self):
-        log.info('Loading aliases: %s ...', self.alias_model_path)
-        alias_model = marshal.load(open(self.alias_model_path,'rb')) 
-        log.info('Enumerating aliases for %i entities...' % len(alias_model))
-        for entity, names in alias_model.iteritems():
-            entity = self.redirects.get(entity, entity)
-            for name in names:
-                yield entity, name
-        alias_model = None
+        # Include some predefined alias set, e.g. yago-means
+        #log.info('Loading aliases: %s ...', self.alias_model_path)
+        #alias_model = marshal.load(open(self.alias_model_path,'rb'))
+        #log.info('Enumerating aliases for %i entities...' % len(alias_model))
+        #for entity, names in alias_model.iteritems():
+        #    entity = redirects.get(entity, entity)
+        #    for name in names:
+        #        yield entity, name
+        #alias_model = None
 
-        log.info('Enumerating redirects...')
+        log.info('Enumerating mappings from canonical titles in entities model...')
+        for eid, label, _ in self.entities_model.iter_entities():
+            eid = self.redirects.get(eid, eid)
+            if self.include_entity(eid):
+                title = self.convert_title_to_name(eid)
+                yield eid, label
+                if title != label:
+                    yield eid, title
+
+        log.info('Enumerating redirect titles...')
         for source, target in self.redirects.iteritems():
-            yield target, self.convert_title_to_name(source)
+            if self.include_entity(target):
+                yield target, self.convert_title_to_name(source)
 
-        log.info('Loading entity ids: %s ...', self.title_model_path)
-        titles = marshal.load(open(self.title_model_path,'rb'))
-        for entity in titles:
-            entity = self.redirects.get(entity, entity)
-            yield entity, self.convert_title_to_name(entity)
-        titles = None
+        log.info('Enumerating mappings in name probability model...')
+        name_model = model.NameProbability(self.name_model_tag)
+        for name, entities_iter in name_model.iter_name_entities():
+            for eid in entities_iter:
+                eid = self.redirects.get(eid, eid)
+                if self.include_entity(eid):
+                    yield eid, name
 
-        name_model = Name()
-        name_model.read(self.name_model_path)
-        name_model = name_model.get_entities_by_name()
-        for name, entities in name_model.iteritems():
-            for entity in entities:
-                yield self.redirects.get(entity, entity), name
-        name_model = None
+    def include_entity(self, entity):
+        return entity in self.entity_set
 
     def __call__(self):
         log.info('Building candidate model...')
-        Candidates().create(self.iter_entity_aliases())
+        Candidates(self.model_tag).create(self.iter_entity_aliases())
+        log.info("Done.")
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('alias_model_path', metavar='ALIAS_MODEL_PATH')
-        p.add_argument('name_model_path', metavar='NAME_MODEL_PATH')
-        p.add_argument('title_model_path', metavar='ENTITY_ID_MODEL_PATH')
+        p.add_argument('entities_model_tag', metavar='ENTITIES_MODEL_TAG')
+        p.add_argument('redirect_model_tag', metavar='REDIRECT_MODEL_TAG')
+        p.add_argument('name_model_tag', metavar='NAME_MODEL_TAG')
+        p.add_argument('model_tag', metavar='CANDIDATE_MODEL_TAG')
         p.set_defaults(cls=cls)
         return p
 
