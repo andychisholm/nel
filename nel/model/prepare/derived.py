@@ -59,9 +59,10 @@ class BuildEntitySet(object):
 
 class BuildLinkModels(object):
     "Build link derived models from a docrep corpus."
-    def __init__(self, page_model_path, entity_set_model_path, model_tag):
+    def __init__(self, page_model_path, redirect_model_tag, entities_model_tag, model_tag):
         self.page_model_path = page_model_path
-        self.entity_set_model_path = entity_set_model_path
+        self.redirect_model_tag = redirect_model_tag
+        self.entities_model_tag = entities_model_tag
         self.model_tag = model_tag
 
     def __call__(self):
@@ -76,20 +77,26 @@ class BuildLinkModels(object):
             links = dr.Store(Link)
 
         log.info('Loading redirects...')
-        redirects = Redirects().dict()
-        entity_counts = defaultdict(int)
-        name_entity_counts = defaultdict(lambda:defaultdict(int))
-        # occurrence = EntityOccurrence() # todo: occurrence model datastore backend
+        redirects = model.Redirects(self.redirect_model_tag).dict()
 
         log.info('Loading entity set...')
-        entity_set = marshal.load(open(self.entity_set_model_path, 'rb'))
+        entity_model = model.Entities(self.entities_model_tag)
+        entity_set = set(entity_model.iter_ids())
 
+        if entity_set:
+            log.info("Building link models over %i entities...", len(entity_set))
+        else:
+            log.warn("Entity set (%s) is empty, build will not yield results.", self.entities_model_tag)
+            return
+
+        entity_counts = defaultdict(int)
+        name_entity_counts = defaultdict(lambda:defaultdict(int))
         with open(self.page_model_path,'r')  as f:
             reader = dr.Reader(f, Doc.schema())
             for i, doc in enumerate(reader):
-                if i % 100000 == 0:
+                if i == 10000 or i % 250000 == 0:
                     log.info('Processed %i documents...', i)
-                
+
                 for link in doc.links:
                     # we may want to ignore subsection links when generating name models
                     # sometimes a page has sections which refer to subsidiary entities
@@ -105,13 +112,14 @@ class BuildLinkModels(object):
                     if target in entity_set:
                         entity_counts[target] += 1
                         name_entity_counts[self.normalise_name(link.anchor)][target] += 1
-        
+
         ep_model = model.EntityPrior(self.model_tag)
         ep_model.create(entity_counts.iteritems())
         entity_counts = None
         nep_model = model.NameProbability(self.model_tag)
         nep_model.create(name_entity_counts.iteritems())
         nep_model = None
+        # occurrence = EntityOccurrence() # todo: occurrence model datastore backend
         log.info('Done')
 
     def normalise_name(self, name):
@@ -119,8 +127,9 @@ class BuildLinkModels(object):
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('page_model_path', metavar='PAGE_MODEL_MODEL')
-        p.add_argument('entity_set_model_path', metavar='ENTITY_SET_MODEL_PATH')
+        p.add_argument('page_model_path', metavar='PAGE_MODEL_PATH')
+        p.add_argument('redirect_model_tag', metavar='REDIRECT_MODEL_TAG')
+        p.add_argument('entities_model_tag', metavar='ENTITIES_MODEL_TAG')
         p.add_argument('model_tag', metavar='MODEL_TAG')
         p.set_defaults(cls=cls)
         return p
