@@ -20,7 +20,7 @@ from ..model import Links
 from ..model import EntityOccurrence, EntityCooccurrence
 from ..model import Candidates
 
-from .util import trim_subsection_link
+from .util import trim_subsection_link, normalise_wikipedia_link
 from ...util import parmapper
 
 log = logging.getLogger()
@@ -76,8 +76,7 @@ class BuildLinkModels(object):
             name = dr.Field()
             links = dr.Store(Link)
 
-        log.info('Loading redirects...')
-        redirects = model.Redirects(self.redirect_model_tag).dict()
+        redirects = model.Redirects(self.redirect_model_tag, prefetch=True)
 
         log.info('Loading entity set...')
         entity_model = model.Entities(self.entities_model_tag)
@@ -103,8 +102,9 @@ class BuildLinkModels(object):
                     # links to these may dilute the name posterior for the main entity
                     # for now we just add everything to keep it simple
                     target = trim_subsection_link(link.target)
-                    target = redirects.get(target, target)
-                    target = trim_subsection_link(link.target)
+                    target = normalise_wikipedia_link(target)
+                    target = redirects.map(target)
+                    target = trim_subsection_link(target)
 
                     #occurrence.add(target, doc.name)
 
@@ -283,12 +283,11 @@ class BuildCandidateModel(object):
 
         self.underscores_re = re.compile('_+')
 
-        log.info('Pre-fetching redirect mappings...')
-        self.redirects = Redirects(redirect_model_tag).dict()
+        self.redirects = Redirects(redirect_model_tag, prefetch=True)
 
         log.info('Pre-fetching kb entity set...')
         self.entities_model = model.Entities(entities_model_tag)
-        self.entity_set = set(self.redirects.get(e,e) for e in self.entities_model.iter_ids())
+        self.entity_set = set(self.redirects.map(e) for e in self.entities_model.iter_ids())
  
     def convert_title_to_name(self, entity):
         # strip parts after a comma
@@ -319,7 +318,7 @@ class BuildCandidateModel(object):
 
         log.info('Enumerating mappings from canonical titles in entities model...')
         for eid, label, _ in self.entities_model.iter_entities():
-            eid = self.redirects.get(eid, eid)
+            eid = self.redirects.map(eid)
             if self.include_entity(eid):
                 title = self.convert_title_to_name(eid)
                 yield eid, label
@@ -327,7 +326,7 @@ class BuildCandidateModel(object):
                     yield eid, title
 
         log.info('Enumerating redirect titles...')
-        for source, target in self.redirects.iteritems():
+        for source, target in self.redirects.cache.iteritems():
             if self.include_entity(target):
                 yield target, self.convert_title_to_name(source)
 
@@ -335,7 +334,7 @@ class BuildCandidateModel(object):
         name_model = model.NameProbability(self.name_model_tag)
         for name, entities_iter in name_model.iter_name_entities():
             for eid in entities_iter:
-                eid = self.redirects.get(eid, eid)
+                eid = self.redirects.map(eid)
                 if self.include_entity(eid):
                     yield eid, name
 
