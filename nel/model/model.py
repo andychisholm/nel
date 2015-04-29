@@ -77,6 +77,10 @@ class NameProbability(object):
         self.mid = 'necounts[{:}]'.format(tag)
         self.store = Store.Get('models:' + self.mid)
 
+    def iter_name_entities(self):
+        for ne in self.store.fetch_all():
+            yield ne['_id'], ne.get('entities', {}).iterkeys()
+
     def probability(self, name, entity, candidates):
         ecs = self.store.fetch(name) or {
             'entities': {},
@@ -131,6 +135,9 @@ class Entities(object):
     def get(self, entity):
         return self.store.fetch(entity)
 
+    def iter_ids(self):
+        return self.store.iter_ids()
+
     def iter_entities(self):
         for entity in self.store.fetch_all():
             yield entity['_id'], entity.get('label', ''), entity.get('description', '')
@@ -164,18 +171,13 @@ class Entities(object):
         })
 
 class Candidates(object):
-    def __init__(self):
-        self.store = Store.Get('models:aliases')
+    def __init__(self, tag):
+        self.mid = 'aliases[{:}]'.format(tag)
+        self.store = Store.Get('models:' + self.mid)
 
     def search(self, alias):
         res = self.store.fetch(alias.lower())
         return res['entities'] if res else []
-
-    def set(self, alias, entities):
-        self.store.save({
-            '_id': alias,
-            'entities': entities
-        })
 
     @staticmethod
     def normalise_alias(name):
@@ -189,22 +191,29 @@ class Candidates(object):
             if len(name) <= 60:
                 entities_by_name[self.normalise_alias(name)].add(entity)
 
-        log.info("Dropping existing candidate set...")
+        log.info("Dropping existing candidate sets...")
         self.store.flush()
 
-        items_iter = entities_by_name.iteritems()
-        total = len(entities_by_name)
-        
-        # todo: refactor to make use of batched inserter class
-        batch_sz = 250000
-        for i in xrange(0, total, batch_sz):
-            log.info("Inserted %i / %i...", i, total)
-            self.store.save_many({
-                '_id': alias,
-                'entities': list(entities)
-            } for alias, entities in itertools.islice(items_iter, batch_sz))
+        log.info("Storing candidate sets for %i names...", len(entities_by_name))
+        count = 0
+        with self.store.batched_inserter(250000) as s:
+            for alias, entities in entities_by_name.iteritems():
+                count += 1
+                s.save({
+                    '_id': alias,
+                    'entities': list(entities)
+                })
+                if count == 10000 or count % 250000 == 0:
+                    log.debug('Stored %i candidate sets...', count)
 
-        log.info("Done.")
+        log.info('Stored %i candidate sets', count)
+
+        metadata_store = Store.Get('models:meta')
+        metadata_store.save({
+            '_id': self.mid,
+            'total_aliases': count,
+            'created_at': get_timestamp()
+        })
 
 class Redirects(object):
     def __init__(self, tag):
