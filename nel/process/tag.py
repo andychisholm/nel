@@ -77,8 +77,8 @@ class Tagger(Process):
         return Mention(begin, text)
 
 class CandidateGenerator(Process):
-    def __init__(self):
-        self.candidates = model.Candidates()
+    def __init__(self, candidate_model_tag):
+        self.candidates = model.Candidates(candidate_model_tag)
  
     def __call__(self, doc):
         for chain in doc.chains:
@@ -135,6 +135,7 @@ class StanfordTagger(Tagger):
         if len(tags) != len(tokens):
             msg = 'Tokenisation error ({:}): #tags({:}) != #toks({:})'.format(doc.id, len(tags), len(tokens))
             raise Exception(msg)
+
         for i, (txt, tag) in enumerate(izip(tokens,tags)):
             if tag != last:
                 if last != 'O':

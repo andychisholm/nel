@@ -8,7 +8,9 @@
     },
     "candidate_generation": {
         "name": "CandidateGenerator",
-        "params": {}
+        "params": {
+            "candidate_model_tag": "wikipedia"
+        }
     },
     "features": [{
             "name": "EntityProbability",
@@ -23,9 +25,7 @@
         }, {
             "name": "BoWMentionContext",
             "params": {
-                "query_ctx_window": "full",
-                "idf_model_path": "/data0/linking/models/wikipedia.entity_context.w_none.idf.model",
-                "entity_ctx_model_path": "/data0/linking/models/wikipedia.entity_context.w_none.tf.model"
+                "context_model_tag": "wikipedia"
             }
         }, {
             "name":"ClassifierScore",
