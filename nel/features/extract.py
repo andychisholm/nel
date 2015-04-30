@@ -31,6 +31,7 @@ class ExtractFeature(object):
             self.recycle_interval = int(self.recycle_interval)
         
         self.extractor = kwargs.pop('featurecls')(**kwargs)
+        self.total_docs = 0
 
     def extract_document_features(self, doc):
         try:
@@ -40,12 +41,17 @@ class ExtractFeature(object):
 
         return doc
 
-    def iter_docs(self, corpus):
+    def get_corpus_filter(self):
         flt = {}
         if self.tag_filter != None:
             flt['tag'] = self.tag_filter
-        
-        cursor = corpus.find(flt, snapshot=True)
+        return flt
+
+    def count_docs(self, corpus):
+        return corpus.count(self.get_corpus_filter())
+
+    def iter_docs(self, corpus):
+        cursor = corpus.find(self.get_corpus_filter(), modifiers={'$snapshot':True})
 
         log.debug("Found %i documents for feature extraction...", cursor.count())
         for json_doc in cursor:
@@ -68,25 +74,32 @@ class ExtractFeature(object):
     
     def __call__(self): 
         # track performance statistics of the feature extraction process
-        total_docs = 0
+        processed_docs = 0
         total_chains = 0
         total_candidates = 0
         start_time = time()
     
         corpus = MongoClient().docs[self.corpus_id]
+        total_docs = self.count_docs(corpus)
         for doc in self.iter_processed_docs(corpus):
-            total_docs += 1
+            processed_docs += 1
             total_chains += len(doc.chains)
             total_candidates += sum(len(m.candidates) for m in doc.chains)
 
-            if total_docs % 100 == 0:
+            if processed_docs % 250 == 0:
                 duration = float(time() - start_time)
+                if processed_docs > 0:
+                    eta = (total_docs - processed_docs) * (duration/processed_docs)
+                else:
+                    eta = 0
+
                 log.info(
-                    'Extracted feature for %i docs... ( %.2f d/s %.2f ch/s %.2f c/s )',
-                    total_docs,
-                    total_docs/duration,
+                    'Extracted for %i docs... (%.2f d/s %.2f ch/s %.2f c/s). eta=%.1fm',
+                    processed_docs,
+                    processed_docs/duration,
                     total_chains/duration,
-                    total_candidates/duration)
+                    total_candidates/duration,
+                    eta/60)
             try:
                 corpus.save(doc.json())
             except:
