@@ -90,7 +90,7 @@ class RedisStore(Store):
         return self.ns + ':' + oid
 
     def to_oid(self, key):
-        return key[len(self.ns)+1:]
+        return key[len(self.ns)+1:].decode('utf-8')
 
     def fetch(self, oid):
         key = self.to_key(oid)
