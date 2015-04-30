@@ -43,7 +43,8 @@ setup(
         "scipy",
         "six",
         "thrift",
-        "wsgiref"
+        "wsgiref",
+        "ujson"
     ],
     test_suite = __pkg_name__ + '.test'
 )
