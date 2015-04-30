@@ -321,9 +321,13 @@ class BuildCandidateModel(object):
             eid = self.redirects.map(eid)
             if self.include_entity(eid):
                 title = self.convert_title_to_name(eid)
-                yield eid, label
+                yield eid, title
                 if title != label:
-                    yield eid, title
+                    yield eid, label
+
+                ascii_title = unicodedata.normalize('NFKD', label).encode('ascii','ignore')
+                if ascii_title != title:
+                    yield eid, ascii_title
 
         log.info('Enumerating redirect titles...')
         for source, target in self.redirects.cache.iteritems():
