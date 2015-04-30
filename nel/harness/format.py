@@ -138,18 +138,18 @@ def markup_to_whitespace(ml):
     parser.feed_data(ml)
     return parser.get_padded_data()
 
-def to_neleval(doc):
+def mention_to_neleval(doc, chain, mention):
     default_probability = 1.0
     default_type = 'UNK'
-    return u'\n'.join(
-        u'\t'.join([
-            doc.id, 
-            str(m.begin), 
-            str(m.end), 
-            '' if chain.resolution == None else chain.resolution.id,
-            str(default_probability),
-            default_type]) 
-        for chain in doc.chains for m in chain.mentions)
+
+    result = u'\t'.join([doc.id, str(mention.begin), str(mention.end)]) + '\t'
+    if chain.resolution:
+        result += u'\t'.join([chain.resolution.id, str(default_probability), default_type])
+
+    return result
+
+def to_neleval(doc):
+    return u'\n'.join(mention_to_neleval(doc, chain, m) for chain in doc.chains for m in chain.mentions)
 
 def to_json(doc):
     return json.dumps({
