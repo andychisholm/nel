@@ -36,9 +36,13 @@ class ConllPrepare(object):
 
     def __call__(self):
         """ Prepare documents """
-        redirects = model.Redirects()
-        candidates = model.Candidates()
+        # todo: parameterise model tags
+        redirects = model.Redirects('wikipedia')
+        candidates = model.Candidates('wikipedia')
 
+        total_mentions = 0
+        total_recalled_mentions = 0
+        
         log.info('Preparing conll documents...')
         for doc, conll_tags in self.iter_docs(self.in_path, self.doc_predicate):
             mentions = []
@@ -61,8 +65,9 @@ class ConllPrepare(object):
                     unique_chains.append(Chain(mentions=ms, resolution=Candidate(r)))
 
             doc.chains = unique_chains
-
+ 
             for chain in doc.chains:
+                total_mentions += len(chain.mentions)
                 # longest mention string
                 sf = sorted(chain.mentions, key=lambda m: len(m.surface_form), reverse=True)[0].surface_form
 
@@ -70,10 +75,13 @@ class ConllPrepare(object):
                 if cs:
                     if chain.resolution.id not in cs:
                         log.warn('Entity (%s) not in candidate set for (%s) in doc (%s).', chain.resolution.id, sf, doc.id)
+                    else:
+                        total_recalled_mentions += len(chain.mentions)
                     chain.candidates = [Candidate(e) for e in cs]
                 else:
                     log.warn('Missing alias (%s): %s' % (doc.id, sf))
             yield doc
+        log.info("Candidate Recall = %.1f%", float(total_recalled_mentions*100)/total_mentions)
 
     @staticmethod
     def iter_docs(path, doc_id_predicate, redirect_model = None, max_docs = None):
