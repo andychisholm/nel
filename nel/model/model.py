@@ -16,6 +16,8 @@ import mmap
 from time import time
 from datetime import datetime
 
+from ..features.mapping import FEATURE_MAPPERS
+
 log = logging.getLogger()
 
 ENC = 'utf8'
@@ -361,6 +363,29 @@ class TermDocumentFrequency(object):
             'total_docs': total_docs,
             'created_at': get_timestamp()
         })
+
+class LinearClassifier(object):
+    mid = 'models:classifiers'
+    def __init__(self, name):
+        self.name = name
+        model = Store.Get(self.mid).fetch(name)
+        if model:
+            self.weights = np.array(model['weights'])
+            self.intercept = model['intercept']
+            self.mapper = FEATURE_MAPPERS[model['mapping']['name']](**model['mapping']['params'])
+        else:
+            raise SystemException('No classifier for name (%s) in store', self.name)
+
+    def score(self, candidate):
+        return np.dot(candidate.fv, self.weights) + self.intercept
+
+    @classmethod
+    def create(cls, name, model):
+        log.info('Storing linear classifier model (%s)...', name)
+        model = dict(model)
+        model['_id'] = name
+        model['created_at'] = get_timestamp()
+        Store.Get(cls.mid).save(model)
 
 class EntityCooccurrence(object):
     def __init__(self, cooccurrence_counts = None, occurrence_counts = None):

@@ -4,6 +4,7 @@ from pymongo import MongoClient
 
 from ..doc import Doc
 from ..features import mapping
+from ..model import model
 
 import logging
 log = logging.getLogger()
@@ -47,17 +48,16 @@ class TrainMentionClassifier(object):
             y.append(cls)
 
         log.info('Fitting model over %i instances...', len(y))
-        model = LinearSVC(**self.hparams)
-        model.fit(X, y)
+        svc = LinearSVC(**self.hparams)
+        svc.fit(X, y)
 
-        correct = sum(1.0 for i, _y in enumerate(model.predict(X)) if y[i] == _y)
+        correct = sum(1.0 for i, _y in enumerate(svc.predict(X)) if y[i] == _y)
         log.info('Training set pairwise classification: %.1f%% (%i/%i)', correct*100/len(y), int(correct), len(y))
 
-        log.info('Storing classifier model (%s)...', self.classifier_id)
-        self.client.models.classifiers.save({
-            '_id': self.classifier_id,
-            'weights': list(model.coef_[0]),
-            'intercept': model.intercept_[0],
+        # todo: refactor to avoid dependency on internal classifier representation here
+        model.LinearClassifier.create(self.classifier_id, {
+            'weights': list(svc.coef_[0]),
+            'intercept': svc.intercept_[0],
             'mapping': {
                 'name': mapper.__class__.__name__,
                 'params': mapper_params

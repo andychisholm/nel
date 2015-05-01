@@ -12,7 +12,7 @@ from functools32 import lru_cache
 from scipy.sparse import csc_matrix
 
 from .feature import Feature
-from .mapping import FEATURE_MAPPERS
+from ..model import model
 from ..model.model import EntityOccurrence
 
 import logging
