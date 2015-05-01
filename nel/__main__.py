@@ -7,7 +7,7 @@ import textwrap
 from .corpora import prepare
 from .harness import harness
 from .features import extract
-from .learn import train
+from .learn import ranking, resolving
 from .model.prepare import wikilinks, wikipedia, wikidata, kopi, \
                            dbpedia, yago, freebase, \
                            derived, wordvec, export, \
@@ -18,10 +18,11 @@ log = logging.getLogger()
 
 APPS = [
     prepare.PrepareCorpus,
+    extract.ExtractFeature,
+    ranking.TrainLinearRanker,
+    resolving.TrainLinearResolver,
     harness.BatchLink,
     harness.ServiceHarness,
-    extract.ExtractFeature,
-    train.Train,
 
     export.ExportEntityInfo,
     export.ExportContextTrainingSet,

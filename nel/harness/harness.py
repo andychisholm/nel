@@ -75,13 +75,13 @@ class ServiceHarness(object):
 
 class BatchLink(object):
     """ Batch linking harness """
-    def __init__(self, corpus, tag, ranker, fmt):
+    def __init__(self, corpus, tag, ranker, resolver, fmt):
         self.corpus = corpus
         self.tag = tag
         self.out_fh = sys.stdout
         
         if ranker:
-            self.link = RankingResolver(ranker)
+            self.link = RankingResolver(ranker, resolver)
         else:
             self.link = None
 
@@ -121,5 +121,6 @@ class BatchLink(object):
         p.add_argument('--tag', metavar='TAG', default=None, required=False)
         p.add_argument('--fmt', metavar='FORMAT', default='neleval', choices=['neleval'], required=False)
         p.add_argument('--ranker', metavar='RANKER', default=None, required=False)
+        p.add_argument('--resolver', metavar='RANKER', default=None, required=False)
         p.set_defaults(cls=cls)
         return p

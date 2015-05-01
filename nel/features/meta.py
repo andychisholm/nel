@@ -39,6 +39,7 @@ class ClassifierScore(Feature):
 
         self._id = model['_id']
         self.weights = np.array(model['weights']).T
+        self.intercept = model['intercept']
         self.mapper = FEATURE_MAPPERS[model['mapping']['name']](**model['mapping']['params'])
 
     @property
@@ -50,7 +51,7 @@ class ClassifierScore(Feature):
 
     def compute(self, doc, chain, candidate, state):
         """ Returns a feature value """
-        return np.dot(candidate.fv, self.weights)
+        return np.dot(candidate.fv, self.weights) + self.intercept
 
     @classmethod
     def add_arguments(cls, p):

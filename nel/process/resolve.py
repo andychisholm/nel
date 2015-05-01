@@ -6,15 +6,17 @@ import logging
 log = logging.getLogger()
 
 class FeatureRankResolver(Process):
-    def __init__(self, feature):
-        self.feature = feature
-    
+    def __init__(self, ranking_feature, resolving_feature = None):
+        self.ranking_feature = ranking_feature
+        self.resolving_feature = resolving_feature
+
     def __call__(self, doc):
         for m in doc.chains:
+            m.resolution = None
             if m.candidates:
-                m.resolution = sorted(m.candidates, key=lambda c: c.features[self.feature], reverse=True)[0] 
-            else:
-                m.resolution = None
+                top_candidate = sorted(m.candidates, key=lambda c: c.features[self.ranking_feature], reverse=True)[0]
+                if not self.resolving_feature or top_candidate.features[self.resolving_feature] > 0:
+                    m.resolution = top_candidate
         return doc
 
 class GreedyOverlapResolver(Process):

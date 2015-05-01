@@ -47,15 +47,16 @@ class OnlineLinker(Pipeline):
 
 class RankingResolver(Pipeline):
     """ Resolves mentions by sorting candidates on a specified features. """
-    def __init__(self, feature):
+    def __init__(self, ranker, resolver = None):
         self.processors = [
-            FeatureRankResolver(feature),
-            GreedyOverlapResolver(feature)
+            FeatureRankResolver(ranker, resolver),
+            GreedyOverlapResolver(ranker)
         ]
     
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('feature', metavar='RANKING_FEATURE_ID', help='id of the feature used to rank candidates')
+        p.add_argument('ranker', metavar='RANKING_FEATURE_ID', help='Id of the feature used to rank candidates')
+        p.add_argument('resolver', required=False, default=None, metavar='RESOLVING_FEATURE_ID', help='Id of the feature used to resolve candidates')
         return p
 
 LINKERS = set([OnlineLinker])
