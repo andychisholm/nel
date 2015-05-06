@@ -113,19 +113,24 @@ class StanfordTagger(Tagger):
             indexes.append(len(tokens)-1)
 
         tags = []
-        max_sz = 1000
+        max_sz = 1024
         s = 0
         e = bisect_left(indexes, max_sz, lo=s)-1
         while True:
             text = ' '.join(tokens[indexes[s]+1:indexes[e]+1]).encode('utf-8')
-            
+
             # todo: investigate why svc blows up if we don't RC after each chunk
             with tcp_socket(self.host, self.port) as s:
                 s.sendall(text+'\n')
-                tagged = s.recv(10*len(text))
-                sentences = tagged.split('\n')
+                buf = ''
+                while True:
+                    buf += s.recv(4096)
+                    if buf[-1] == '\n' or len(buf) > 10*len(text):
+                        break
+                sentences = buf.split('\n')
+
             tags += [t.split('/')[-1] for s in sentences for t in s.split(' ')[:-1]]
-            
+
             if e+1 == len(indexes):
                 break
             else:
@@ -133,8 +138,7 @@ class StanfordTagger(Tagger):
                 e = bisect_left(indexes, indexes[s]+max_sz, lo=s)-1
 
         if len(tags) != len(tokens):
-            msg = 'Tokenisation error ({:}): #tags({:}) != #toks({:})'.format(doc.id, len(tags), len(tokens))
-            raise Exception(msg)
+            raise Exception('Tokenisation error: #tags != #tokens')
 
         for i, (txt, tag) in enumerate(izip(tokens,tags)):
             if tag != last:
