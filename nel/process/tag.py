@@ -101,57 +101,66 @@ class StanfordTagger(Tagger):
 
     def _tag(self, doc):
         start_time = time()
-        i = 0
-        start = None
-        last = 'O'
-
         tokens = [t.text.replace('\n', ' ').replace('\r',' ') for t in doc.tokens]
+ 
+        if tokens:
+            acc = 0
+            token_offsets = []
+            character_to_token_offset = {0:-1}
+            for i, t in enumerate(tokens):
+                acc += len(t) + 1
+                token_offsets.append(acc)
+                character_to_token_offset[acc] = i
 
-        # calculate sentence offsets 
-        indexes = [-1] + [i for i,t in enumerate(tokens) if t == '.']
-        if indexes[-1] != (len(tokens)-1):
-            indexes.append(len(tokens)-1)
+            # calculate character indexes of sentence delimiting tokens
+            indexes = [0] + [token_offsets[i] for i,t in enumerate(tokens) if t == '.']
+            if token_offsets and indexes[-1] != (token_offsets[-1]):
+                indexes.append(token_offsets[-1])
 
-        tags = []
-        max_sz = 1024
-        s = 0
-        e = bisect_left(indexes, max_sz, lo=s)-1
-        while True:
-            text = ' '.join(tokens[indexes[s]+1:indexes[e]+1]).encode('utf-8')
+            tags = []
+            max_sz = 1024
+            si = 0
+            ei = bisect_left(indexes, max_sz, lo=si)-1
+            while True:
+                chunk_start_tok_idx = character_to_token_offset[indexes[si]]+1
+                chunk_end_tok_idx = character_to_token_offset[indexes[ei]]+1
+                text = ' '.join(tokens[chunk_start_tok_idx:chunk_end_tok_idx]).encode('utf-8')
 
-            # todo: investigate why svc blows up if we don't RC after each chunk
-            with tcp_socket(self.host, self.port) as s:
-                s.sendall(text+'\n')
-                buf = ''
-                while True:
-                    buf += s.recv(4096)
-                    if buf[-1] == '\n' or len(buf) > 10*len(text):
-                        break
-                sentences = buf.split('\n')
+                # todo: investigate why svc blows up if we don't RC after each chunk
+                with tcp_socket(self.host, self.port) as s:
+                    s.sendall(text+'\n')
+                    buf = ''
+                    while True:
+                        buf += s.recv(4096)
+                        if buf[-1] == '\n' or len(buf) > 10*len(text):
+                            break
+                    sentences = buf.split('\n')
 
-            tags += [t.split('/')[-1] for s in sentences for t in s.split(' ')[:-1]]
+                tags += [t.split('/')[-1] for s in sentences for t in s.split(' ')[:-1]]
 
-            if e+1 == len(indexes):
-                break
-            else:
-                s = e
-                e = bisect_left(indexes, indexes[s]+max_sz, lo=s)-1
+                if ei+1 == len(indexes):
+                    break
+                else:
+                    si = ei
+                    ei = bisect_left(indexes, indexes[si]+max_sz, lo=si)-1
 
-        if len(tags) != len(tokens):
-            raise Exception('Tokenisation error: #tags != #tokens')
+            if len(tags) != len(tokens):
+                raise Exception('Tokenisation error: #tags != #tokens')
 
-        for i, (txt, tag) in enumerate(izip(tokens,tags)):
-            if tag != last:
-                if last != 'O':
-                    yield self._mention_over_tokens(doc, start, i)
-                last = tag
-                start = i
-            i += 1
+            start = None
+            last = 'O'
+            for i, (txt, tag) in enumerate(izip(tokens,tags)):
+                if tag != last:
+                    if last != 'O':
+                        yield self._mention_over_tokens(doc, start, i)
+                    last = tag
+                    start = i
+                i += 1
 
-        if last != 'O':
-            yield self._mention_over_tokens(doc, start, i)
+            if last != 'O':
+                yield self._mention_over_tokens(doc, start, i)
 
-        log.debug('Tagged doc (%s) with %i tokens in %.1fs', doc.id, len(doc.tokens), time() - start_time)
+        log.debug('Tagged doc (%s) with %i tokens in %.2fs', doc.id, len(doc.tokens), time() - start_time)
 
 MAX_MENTION_LEN = 4
 class LookupTagger(Tagger):
