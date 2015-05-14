@@ -103,6 +103,11 @@ class StanfordTagger(Tagger):
         start_time = time()
         tokens = [t.text.replace('\n', ' ').replace('\r',' ') for t in doc.tokens]
  
+        # the insanity below is motivated by the following:
+        # - stanford doesn't tag everything we send it if we send it too much
+        # - therefore we need to slice up the text into chunks of at most max_size
+        # - however, we can't slice between sentences or tokens without hurting the tagger accuracy
+        # - stanford doesn't return offsets, so we must keep tokens we send and tags returned aligned
         if tokens:
             acc = 0
             token_offsets = []
@@ -143,6 +148,11 @@ class StanfordTagger(Tagger):
                 else:
                     si = ei
                     ei = bisect_left(indexes, indexes[si]+max_sz, lo=si)-1
+
+                    # if we can't find a step less than the max size, the best we can do
+                    # is take the smalled possible step and hope for the best
+                    if ei == si:
+                        ei += 1
 
             if len(tags) != len(tokens):
                 raise Exception('Tokenisation error: #tags != #tokens')
