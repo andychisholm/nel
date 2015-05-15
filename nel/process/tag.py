@@ -99,6 +99,17 @@ class StanfordTagger(Tagger):
     def to_mention(self, doc, start, end):
         return mention
 
+    @staticmethod
+    def get_span_end(indexes, start, max_sz=1024):
+        end = bisect_left(indexes, max_sz, lo=start)-1
+
+        # if we can't find a step less than max_sz, we try to
+        # take the smallest possible step and hope for the best
+        if end <= start:
+            end = start + 1
+
+        return end
+
     def _tag(self, doc):
         start_time = time()
         tokens = [t.text.replace('\n', ' ').replace('\r',' ') for t in doc.tokens]
@@ -123,9 +134,7 @@ class StanfordTagger(Tagger):
                 indexes.append(token_offsets[-1])
 
             tags = []
-            max_sz = 1024
-            si = 0
-            ei = bisect_left(indexes, max_sz, lo=si)-1
+            si, ei = 0, self.get_span_end(indexes, 0)
             while True:
                 chunk_start_tok_idx = character_to_token_offset[indexes[si]]+1
                 chunk_end_tok_idx = character_to_token_offset[indexes[ei]]+1
@@ -146,13 +155,7 @@ class StanfordTagger(Tagger):
                 if ei+1 == len(indexes):
                     break
                 else:
-                    si = ei
-                    ei = bisect_left(indexes, indexes[si]+max_sz, lo=si)-1
-
-                    # if we can't find a step less than the max size, the best we can do
-                    # is take the smalled possible step and hope for the best
-                    if ei == si:
-                        ei += 1
+                    si, ei = ei, self.get_span_end(indexes, ei)
 
             if len(tags) != len(tokens):
                 raise Exception('Tokenisation error: #tags != #tokens')
