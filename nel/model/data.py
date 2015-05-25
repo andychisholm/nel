@@ -3,7 +3,8 @@ import redis
 import re
 import ujson as json
 
-from itertools import islice
+from collections import defaultdict
+from itertools import islice, izip
 from pymongo import MongoClient
 
 import logging
@@ -13,6 +14,9 @@ DATASTORE_URI_VAR = 'NEL_DATASTORE_URI'
 
 class Store(object):
     def fetch(self, oid):
+        raise NotImplementedError
+
+    def fetch_field(self, oid, field):
         raise NotImplementedError
 
     def save(self, obj):
@@ -26,6 +30,21 @@ class Store(object):
 
     def fetch_all(self):
         raise NotImplementedError
+
+    def fetch_many(self, oids):
+        raise NotImplementedError
+
+    def inc(self, oid, field, value):
+        raise NotImplementedError
+
+    def inc_many(self, inc_op_iter):
+        raise NotImplementedError
+
+    def to_db_field(self, field):
+        return field
+
+    def from_db_field(self, field):
+        return field
 
     def iter_ids(self):
         raise NotImplementedError
@@ -43,48 +62,27 @@ class Store(object):
         return BatchInserter(self, batch_size)
 
     @staticmethod
-    def Get(store_id, url = None):
-        url = url or os.environ.get(DATASTORE_URI_VAR, 'mongodb://localhost')
+    def Get(store_id, **kwargs):
+        uri = kwargs.pop('uri', None)
+        uri = uri or os.environ.get(DATASTORE_URI_VAR, 'mongodb://localhost')
+        proto = uri.split(':')[0] if uri else None
 
-        if url.startswith('mongodb'):
-            log.debug("Using mongo data store for (%s)...", store_id)
-            db, collection = store_id.split(':')
-            return MongoStore(db, collection, url=url)
-        elif url.startswith('redis'):
-            log.debug("Using redis data store for (%s)...", store_id)
-            return RedisStore(store_id, url=url)
-        else:
-            log.error('Unsupported data store')
+        store_cls = {
+            'mongodb': MongoStore,
+            'redis': RedisStore
+        }.get(proto, None)
+
+        if store_cls == None:
+            log.error('Unsupported data store proto (%s), choose from (redis,mongodb)', proto)
             raise NotImplementedError
 
-class BatchInserter(object):
-    def __init__(self, store, batch_size):
-        self.store = store
-        self.batch_size = batch_size
-        self.batch = []
-
-    def flush(self):
-        if self.batch:
-            self.store.save_many(self.batch)
-            self.batch = []
-
-    def save(self, obj):
-        self.batch.append(obj)
-        if len(self.batch) > self.batch_size:
-            self.flush()
-
-    def __enter__(self):
-        self.batch = []
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.flush()
+        return store_cls.Get(store_id, uri, **kwargs)
 
 class RedisStore(Store):
-    def __init__(self, namespace, url='redis://localhost'):
-        self.kvs = redis.from_url(url)
+    """ Abstract base class for stores built on redis """
+    def __init__(self, namespace, uri):
+        self.kvs = redis.from_url(uri)
         self.ns = namespace
-        self.fmt = json
 
     def to_key(self, oid):
         return self.ns + ':' + oid
@@ -92,10 +90,61 @@ class RedisStore(Store):
     def to_oid(self, key):
         return key[len(self.ns)+1:].decode('utf-8')
 
+    def fetch_many(self, oids):
+        return self._fetch_batch(self.to_key(oid) for oid in oids)
+
+    def _fetch_batch(self, keys_iter):
+        raise NotImplementedError
+
+    def iter_ids(self):
+        for key in self.keys():
+            yield self.to_oid(key)
+
+    def flush(self):
+        self.kvs.eval("""
+            local keys = redis.call('keys', '{:}*')
+            for i=1,#keys,5000 do
+                redis.call('del', unpack(keys, i, math.min(i+4999, #keys)))
+            end
+        """.format(re.escape(self.ns+':').replace('\\','\\\\')), 0)
+
+    def delete(self, oid):
+        self.kvs.delete(self.to_key(oid))
+
+    def keys(self):
+        return self.kvs.keys(re.escape(self.to_key('')) + '*')
+
+    @classmethod
+    def Get(cls, namespace, url='redis://localhost', flat = False):
+        log.debug("Using %s redis data store for (%s)...", 'hashed' if flat else 'serialised', namespace)
+        if flat:
+            return HashedRedisStore(namespace, url)
+        else:
+            return SerialisedRedisStore(namespace, url, fmt = json)
+
+class SerialisedRedisStore(RedisStore):
+    def __init__(self, *args, **kwargs):
+        self.fmt = kwargs.pop('fmt')
+        super(SerialisedRedisStore, self).__init__(*args, **kwargs)
+
+    def deserialise(self, data):
+        return self.fmt.loads(data)
+
+    def serialise(self, obj):
+        return self.fmt.dumps(obj)
+
+    def _fetch_batch(self, keys_iter):
+        for data in self.kvs.mget(keys_iter):
+            yield self.deserialise(data) 
+
     def fetch(self, oid):
         key = self.to_key(oid)
         data = self.kvs.get(key)
         return self.deserialise(data) if data != None else None
+
+    def fetch_field(self, oid, field):
+        # this is an inefficient operation for serialised redis stores
+        return self.fetch(oid).get(field, None)
 
     def fetch_all(self):
         keys = self.keys()
@@ -103,12 +152,8 @@ class RedisStore(Store):
         if keys:
             batch_sz = 100000
             for _ in xrange(0, len(keys), batch_sz):
-                for data in self.kvs.mget(islice(keys_iter, batch_sz)):
-                    yield self.deserialise(data)
-
-    def iter_ids(self):
-        for key in self.keys():
-            yield self.to_oid(key)
+                for obj in self._fetch_batch(islice(keys_iter, batch_sz)):
+                    yield obj
 
     def save(self, obj):
         key = self.to_key(obj['_id'])
@@ -117,33 +162,72 @@ class RedisStore(Store):
 
     def save_many(self, obj_iter):
         self.kvs.mset({
-            self.to_key(obj['_id']) : self.serialise(obj) 
+            self.to_key(obj['_id']): self.serialise(obj)
             for obj in obj_iter})
 
-    def flush(self):
-        # todo: is there a better way to do this?
-        keys = self.keys()
-        if keys:
-            self.kvs.delete(keys)
+class HashedRedisStore(RedisStore):
+    def __init__(self, *args, **kwargs):
+        super(HashedRedisStore, self).__init__(*args, **kwargs)
 
-    def delete(self, oid):
-        self.kvs.delete(self.to_key(oid))
+    def fetch(self, oid):
+        obj = self.kvs.hgetall(self.to_key(oid))
+        if obj:
+            obj['_id'] = oid
+        else:
+            obj = None
+        return obj
 
-    def keys(self):
-        return self.kvs.keys(re.escape(self.to_key('')) + '*')
+    def fetch_field(self, oid, field):
+        return self.kvs.hget(self.to_key(oid), field)
 
-    def deserialise(self, data):
-        return self.fmt.loads(data)
+    def _fetch_batch(self, keys_iter):
+        with self.kvs.pipeline(transaction=False) as p:
+            keys = list(keys_iter)
+            for key in keys:
+                p.hgetall(key)
+            for key, obj in izip(keys, pipeline.execute()):
+                obj['_id'] = self.to_oid(key)
+                yield obj
+
+    def save(self, obj):
+        self._save(obj)
     
-    def serialise(self, obj):
-        return self.fmt.dumps(obj)
+    def _save(self, obj, interface=None):
+        interface = interface if interface != None else self.kvs
+        key = self.to_key(obj['_id'])
+        obj = dict(obj)
+        obj.pop('_id', None)
+        interface.hmset(key, obj)
+
+    def save_many(self, obj_iter):
+        with self.kvs.pipeline(transaction=False) as p:
+            for obj in obj_iter:
+                self._save(obj, interface=p)
+            p.execute()
+
+    def inc(self, oid, field, value):
+        self._inc(oid, field, value)
+
+    def _inc(self, oid, field, value, interface=None):
+        interface = interface if interface != None else self.kvs
+        interface.hincrby(self.to_key(oid), field, value)
+
+    def inc_many(self, updates_by_oid_iter):
+        with self.kvs.pipeline(transaction=False) as p:
+            for oid, updates in updates_by_oid_iter:
+                for field, value in updates:
+                    self._inc(oid, field, value, interface=p)
+            p.execute()
 
 class MongoStore(Store):
-    def __init__(self, db, collection, url='mongodb://localhost'):
-        self.collection = MongoClient(url)[db][collection]
+    def __init__(self, db, collection, uri='mongodb://localhost'):
+        self.collection = MongoClient(uri)[db][collection]
 
     def fetch(self, oid):
         return self.collection.find_one({'_id':oid})
+
+    def fetch_field(self, oid, field):
+        return self.collection.find_one({'_id':oid}, {field:True}).get(field, None)
 
     def fetch_all(self):
         return self.collection.find()
@@ -156,10 +240,65 @@ class MongoStore(Store):
         self.collection.save(obj)        
    
     def save_many(self, obj_iter):
-        self.collection.insert(obj_iter)    
+        self.collection.insert(obj_iter)
 
     def flush(self):
         self.collection.drop()
 
     def delete(self, oid):
         self.collection.delete_one({'_id':oid})
+
+    def to_db_field(self, field):
+        return field.replace('.', u'\u2024').replace('$',u'\uff04')
+
+    def from_db_field(self, field):
+        return field.replace(u'\u2024', '.').replace(u'\uff04','$')
+
+    def inc(self, oid, field, value):
+        self.inc_many([(oid,self.to_db_field(field),value)])
+
+    def inc_many(self, updates_by_oid_iter):
+        bulk = self.collection.initialize_unordered_bulk_op()
+        for oid, updates in updates_by_oid_iter:
+            if updates:
+                bulk.find({
+                    '_id': oid
+                }).upsert().update_one({
+                    '$inc': {self.to_db_field(f):v for f,v in updates.iteritems()}
+                })
+        bulk.execute()
+
+    @classmethod
+    def Get(cls, store_id, uri='mongodb://localhost', **kwargs):
+        db, collection = store_id.split(':')
+
+        log.debug("Using mongo data store (db=%s, collection=%s)...", db, collection)
+        return MongoStore(db, collection, uri)
+
+class BatchedOperation(object):
+    def __init__(self, operation, batch_size):
+        self.batch_size = batch_size
+        self.batch = []
+        self.operation = operation
+
+    def flush(self):
+        if self.batch:
+            self.operation(self.batch)
+            self.batch = []
+
+    def append(self, obj):
+        self.batch.append(obj)
+        if len(self.batch) >= self.batch_size:
+            self.flush()
+
+    def __enter__(self):
+        self.batch = []
+        return self
+
+    def __exit__(self, etype, evalue, etraceback):
+        if etype == None:
+            self.flush()
+
+class BatchInserter(BatchedOperation):
+    def __init__(self, store, batch_size):
+        super(BatchInserter, self).__init__(store.save_many, batch_size)
