@@ -58,6 +58,18 @@ doc = linker(doc)
 print inject_html_links(raw, doc)
 ```
 
+#### Output
+```
+<html>
+  <body>
+    Sample document with html <a href='#'>markup</a>.
+    It mentions a prominent entity like <a href="https://en.wikipedia.org/wiki/Barack_Obama">Barack Obama</a>.
+    And contains coreferential mentions like <a href="https://en.wikipedia.org/wiki/Barack_Obama">Obama</a>.
+    NEL can disambiguate these against <a href="https://en.wikipedia.org/wiki/Wikipedia">Wikipedia</a> and annotate the original document with links.
+  </body>
+</html>
+```
+
 ### Getting Started
 
 Documentation is a **work in progress**, see the [install guide](docs/guide.md) to get started.
