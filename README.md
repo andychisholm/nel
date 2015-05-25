@@ -9,7 +9,7 @@ Implementation based on work described in *Entity Disambiguation with Web Links*
 
 ```python
 from nel.doc import Doc
-from nel.harness.format import markup_to_whitespace, doc_to_markup
+from nel.harness.format import markup_to_whitespace, inject_html_links
 from nel.process.process import Pipeline
 from nel.process.tokenise import RegexTokeniser, TOKEN_RE
 from nel.process.tag import StanfordTagger, CandidateGenerator
@@ -18,12 +18,12 @@ from nel.process.resolve import FeatureRankResolver, GreedyOverlapResolver
 
 raw = """
 <html>
-    <body>
-        Sample document with html <a href='#'>markup</a>.
-        It mentions a prominent entity like Barack Obama.
-        And includes coreference mentions like Obama.
-        Hopefully we can link them to Wikipedia.
-    </body>
+  <body>
+    Sample document with html <a href='#'>markup</a>.
+    It mentions a prominent entity like Barack Obama.
+    And contains coreferential mentions like Obama.
+    NEL can disambiguate these against Wikipedia and annotate the original document with links.
+  </body>
 </html>
 """.decode('utf-8')
 
@@ -55,7 +55,7 @@ linker = Pipeline([
 
 doc = linker(doc)
 
-print doc_to_markup(doc, raw)
+print inject_html_links(raw, doc)
 ```
 
 ### Getting Started
