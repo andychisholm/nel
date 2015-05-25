@@ -37,7 +37,8 @@ class ExtractFeature(object):
         try:
             doc = self.extractor(doc)
         except Exception, e:
-            log.warn('Feature extractor exception: %s', str(e))
+            log.warn('Feature extractor exceptions: %s', str(e))
+            raise
 
         return doc
 
@@ -72,7 +73,9 @@ class ExtractFeature(object):
         except Exception, e:
             log.warn('Exception during feature extraction: %s', str(e))
     
-    def __call__(self): 
+    def __call__(self):
+        log.info("Extracting %s feature...", self.extractor.__class__.__name__)
+
         # track performance statistics of the feature extraction process
         processed_docs = 0
         total_chains = 0
@@ -111,7 +114,7 @@ class ExtractFeature(object):
     def add_arguments(cls, p):
         p.add_argument('--corpus', metavar='CORPUS')
         p.add_argument('--tag', default=None, required=False, metavar='TAG_FILTER')
-        p.add_argument('--processes', default=None, required=False, metavar='PROCESS_COUNT')
+        p.add_argument('--processes', default=None, required=False, type=int, metavar='PROCESS_COUNT')
         p.add_argument('--recycle', default=None, required=False, metavar='WORKER_RECYCLE_INTERVAL')
         p.set_defaults(cls=cls)
 
