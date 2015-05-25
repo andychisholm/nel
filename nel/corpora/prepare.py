@@ -16,12 +16,14 @@ class PrepareCorpus(object):
     def __call__(self):
         log.info("Dropping existing %s document...", self.corpus_id)
         self.store.drop()
+
         log.info('Loading documents for corpus %s...', self.corpus_id)
         for i, doc in enumerate(self.parse()):
             if i % 100 == 0:
                 log.debug('Processed %i documents...', i)
             self.store.insert(doc.json())
-        log.info('Done.')
+
+        log.info('Import completed for %i documents.', i)
 
     APPS=set()
     @classmethod
