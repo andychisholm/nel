@@ -24,7 +24,6 @@ def iter_wikidata_items(dump_path):
                 eta = 0 if i == 0 else ((elapsed / completed)-elapsed) / 60
 
                 log.debug('Processed %i wikidata items, ~%.1f%%, eta=%.2fm ...', i, completed*100, eta)
-            
             try:
                 yield json.loads(line.rstrip(',\n'))
             except ValueError:
@@ -61,6 +60,7 @@ def get_entity_for_item(item):
 
     description = item.get('descriptions',{}).get('en',{}).get('value', '')
     label = item.get('labels',{}).get('en',{}).get('value', None)
+    aliases = [a['value'] for a in item.get('aliases', {}).get('en', [])]
 
     # try to populate missing descriptions using parenthetical disambiguations
     # populate missing entity labels based on the entity id
@@ -75,7 +75,7 @@ def get_entity_for_item(item):
         if not label:
             label = entity
 
-    return normalise_wikipedia_title(entity), label, description
+    return normalise_wikipedia_title(entity), label, description, aliases
 
 def normalise_wikipedia_title(title):
     return title.replace(' ', '_')
@@ -158,11 +158,10 @@ class BuildWikidataEntitySet(object):
                         log.info('Processed %i entities...', entity_count)
 
         log.info('Building entity set over %i possible entities...', entity_count)
-        
         included_entities = set()
         for node in self.included_nodes:
             node_count = 0
-            for eid in self.iter_leaves(relation_graph, node):
+            for eid in self.iter_children(relation_graph, node):
                 if eid in entities:
                     included_entities.add(eid)
                     node_count += 1
@@ -170,12 +169,20 @@ class BuildWikidataEntitySet(object):
 
         for node in self.excluded_nodes:
             node_count = 0
-            for eid in self.iter_leaves(relation_graph, node):
+            for eid in self.iter_children(relation_graph, node):
                 if eid in included_entities:
                     included_entities.remove(eid)
                     node_count += 1
             log.debug("Total = %i entities after excluding %i derived from Q%i", len(included_entities), node_count, node)
 
+        # alias expansion tricks
+        PERSON_WKID=215627
+        for eid in self.iter_children(relation_graph, PERSON_WKID):
+            if eid in included_entities:
+                e = entities[eid]
+                label = e[1].strip()
+                if label:
+                    e[3].append(label.split()[-1])
 
         # there seem to be a few minors errors with wikidata sitelinks where multiple wikidata
         # items map to the same wikipedia entity, e.g. 671315 and 19371531 both map to 'Helmeringhausen'
@@ -187,7 +194,7 @@ class BuildWikidataEntitySet(object):
         entity_model = Entities(self.model_tag)
         entity_model.create(entities.itervalues())
 
-    def iter_leaves(self, graph, root, excluded = None):
+    def iter_children(self, graph, root, excluded = None):
         # tracks visited nodes; excludes nodes from traversal if pre-populated
         excluded = set() if excluded == None else excluded
         pending = list(graph[root])
@@ -201,8 +208,7 @@ class BuildWikidataEntitySet(object):
             children = graph.get(node, None)
             if children:
                 pending += [n for n in children if n not in excluded]
-            else:
-                yield node
+            yield node
 
     @classmethod
     def add_arguments(cls, p):
