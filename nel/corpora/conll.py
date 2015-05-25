@@ -81,7 +81,8 @@ class ConllPrepare(object):
                 else:
                     log.warn('Missing alias (%s): %s' % (doc.id, sf))
             yield doc
-        log.info("Candidate Recall = %.1f%", float(total_recalled_mentions*100)/total_mentions)
+
+        log.info("Candidate Recall = %.1f%% (%i/%i)", float(total_recalled_mentions*100)/total_mentions, total_recalled_mentions, total_mentions)
 
     @staticmethod
     def iter_docs(path, doc_id_predicate, redirect_model = None, max_docs = None):
