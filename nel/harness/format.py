@@ -148,6 +148,38 @@ def mention_to_neleval(doc, chain, mention):
 
     return result
 
+def inject_html_links(raw, linked_doc, kb_prefix=None):
+    return inject_links(raw, linked_doc, u'<a href="{kb_pfx}{entity}">{mention}</a>', kb_prefix=kb_prefix)
+
+def inject_markdown_links(raw, linked_doc, kb_prefix=None):
+    return inject_links(raw, linked_doc, u'[{mention}]({kb_pfx}{entity})', kb_prefix=kb_prefix)
+
+def inject_links(raw, linked_doc, link_format, kb_prefix=None):
+    kb_prefix = 'https://en.wikipedia.org/wiki/' if kb_prefix == None else kb_prefix
+
+    mentions_by_offset = sorted(
+        (m.begin, m, c.resolution.id)
+        for c in linked_doc.chains
+            for m in c.mentions
+                if c.resolution != None)
+
+    output = []
+    last_offset = None
+    for offset, mention, entity_id in mentions_by_offset:
+        output.append(raw[last_offset:offset])
+
+        # todo: handle escaping
+        output.append(
+            link_format.format(
+                mention = mention.text,
+                kb_pfx = kb_prefix,
+                entity = entity_id))
+
+        last_offset = mention.end
+
+    output.append(raw[last_offset:None])
+    return ''.join(output)
+
 def to_neleval(doc):
     return u'\n'.join(mention_to_neleval(doc, chain, m) for chain in doc.chains for m in chain.mentions)
 
