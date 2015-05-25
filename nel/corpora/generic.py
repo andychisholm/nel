@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-import re
 from collections import defaultdict
 
 from .prepare import PrepareCorpus
