@@ -278,7 +278,7 @@ class NameProbability(CountModel):
             ne_counts[name][entity] += 1
 
         log.debug('Accumulating %i name->entity counts...', len(name_entity_iter))
-        super(NameProbability, self).merge(ne_counts.iteritems())
+        super(NameProbability, self).merge((name, counts.iteritems()) for name, counts in ne_counts.iteritems())
 
 class EntityTermFrequency(CountModel):
     def __init__(self, tag, uri=None):

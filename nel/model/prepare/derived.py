@@ -61,85 +61,79 @@ class MRCorpusProcessor(object):
                     for result in results:
                         yield result
 
-class BuildLinkModels(object):
+class BuildLinkModels(MRCorpusProcessor):
     "Build link derived models from a docrep corpus."
-    def __init__(self, page_model_path, redirect_model_tag, entities_model_tag, model_tag):
-        self.page_model_path = page_model_path
-        self.redirect_model_tag = redirect_model_tag
-        self.entities_model_tag = entities_model_tag
-        self.model_tag = model_tag
-
-    def __call__(self):
-        log.info('Building page link derived models from: %s', self.page_model_path)
-
+    def __init__(self, docs_path, redirect_model_tag, entities_model_tag, model_tag):
         class Link(dr.Ann):
             anchor = dr.Field()
             target = dr.Field()
-
         class Doc(dr.Doc):
             name = dr.Field()
             links = dr.Store(Link)
 
-        redirects = model.Redirects(self.redirect_model_tag, prefetch=False) #True)
+        super(BuildLinkModels, self).__init__(docs_path, Doc.schema())
+
+        self.model_tag = model_tag
+        self.entities_model_tag = entities_model_tag
+        self.redirects = model.Redirects(redirect_model_tag, prefetch=False) #True)
+
+        entity_model = model.Entities(self.entities_model_tag)
 
         log.info('Loading entity set...')
-        entity_model = model.Entities(self.entities_model_tag)
-        entity_set = set(entity_model.iter_ids())
+        self.entity_set = set(entity_model.iter_ids())
 
-        if entity_set:
-            log.info("Building link models over %i entities...", len(entity_set))
+        if self.entity_set:
+            log.info("Building link models over %i entities...", len(self.entity_set))
         else:
-            log.warn("Entity set (%s) is empty, build will not yield results.", self.entities_model_tag)
-            return
+            raise Exception("Entity set (%s) is empty, build will not yield results.", self.entities_model_tag)
 
-        entity_counts = defaultdict(int)
+    def mapper(self, doc):
+        name_entity_pairs = []
+
+        for link in doc.links:
+            # we may want to ignore subsection links when generating name models
+            # sometimes a page has sections which refer to subsidiary entities
+            # links to these may dilute the name posterior for the main entity
+            # for now we just add everything to keep it simple
+            target = trim_subsection_link(link.target)
+            target = normalise_wikipedia_link(target)
+            target = self.redirects.map(target)
+            target = trim_subsection_link(target)
+
+            # ignore out-of-kb links in entity and name probability models
+            if target in self.entity_set:
+                name_entity_pairs.append((link.anchor.lower(), target))
+
+        return name_entity_pairs
+
+    def __call__(self):
+        log.info('Building page link derived models from: %s', self.docs_path)
+
         nep_model = model.NameProbability(self.model_tag)
+        log.info("Flushing name model counts...")
+        nep_model.store.flush()
+
         #co_model = EntityCooccurrence(self.model_tag, store_uri='mongodb://localhost')
-
-        #log.info("Flushing name model counts...")
-        #nep_model.store.flush()
-
         #log.info("Flushing cooccurrence counts...")
         #co_model.store.flush()
 
-        with open(self.page_model_path,'r')  as f, data.BatchedOperation(nep_model.merge, 5000000) as nep_merger:
-            reader = dr.Reader(f, Doc.schema())
-            for i, doc in enumerate(reader):
+        entity_counts = Counter()
+        with data.BatchedOperation(nep_model.merge, 1000000) as nep_merger:
+            for i, name_entity_pairs in enumerate(self.iter_results()):
                 if i == 10000 or i % 250000 == 0:
                     log.info('Processed %i documents...', i)
 
-                entities = set()
-                for link in doc.links:
-                    # we may want to ignore subsection links when generating name models
-                    # sometimes a page has sections which refer to subsidiary entities
-                    # links to these may dilute the name posterior for the main entity
-                    # for now we just add everything to keep it simple
-                    target = trim_subsection_link(link.target)
-                    target = normalise_wikipedia_link(target)
-                    target = redirects.map(target)
-                    target = trim_subsection_link(target)
-
-                    # ignore out-of-kb links in entity and name probability models
-                    if target in entity_set:
-                        # keep track of the set of entities mentioned in this document
-                        entities.add(target)
-                        entity_counts[target] += 1
-                        nep_merger.append((self.normalise_name(link.anchor), target))
-
-                #if entities:
-                #    co_merger.append(list(entities))
+                entity_counts.update(e for _, e in name_entity_pairs)
+                for pair in name_entity_pairs:
+                    nep_merger.append(pair)
 
         ep_model = model.EntityPrior(self.model_tag)
         ep_model.create(entity_counts.iteritems())
-        entity_counts = None
         log.info('Done')
-
-    def normalise_name(self, name):
-        return name.lower()
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('page_model_path', metavar='PAGE_MODEL_PATH')
+        p.add_argument('docs_path', metavar='DOCS_PATH')
         p.add_argument('redirect_model_tag', metavar='REDIRECT_MODEL_TAG')
         p.add_argument('entities_model_tag', metavar='ENTITIES_MODEL_TAG')
         p.add_argument('model_tag', metavar='MODEL_TAG')
@@ -357,10 +351,6 @@ class BuildMentionModel(MRCorpusProcessor):
         import code
         code.interact(local=locals())
         return mentions
-
-    def combiner(self, results):
-        # todo: itertools.chain(results)
-        return results
 
     def __call__(self):
         log.info("Processing docs: %s ...", self.docs_path)
