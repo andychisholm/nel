@@ -25,110 +25,6 @@ ENC = 'utf8'
 def get_timestamp():
     return datetime.fromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
 
-class EntityPrior(object):
-    """ Entity prior. """
-    def __init__(self, tag):
-        self.mid = 'ecounts[{:}]'.format(tag)
-        self.store = Store.Get('models:' + self.mid)
-
-        metadata = Store.Get('models:meta').fetch(self.mid) or {}
-        self.entity_count = metadata.get('count', 0)
-        self.total = metadata.get('total', 0)
-
-    def count(self, entity):
-        item = self.store.fetch(entity) or {}
-        return item.get('count', 0)
-
-    def prior(self, entity):
-        "Return score for entity, default 1e-20."
-        count = float(self.count(entity))
-        return max(1e-20, count / self.total)
-
-    def create(self, entity_count_iter):
-        metadata_store = Store.Get('models:meta')
-        
-        log.info('Flushing existing entity counts...')
-        self.store.flush()
-        metadata_store.delete(self.mid)
-
-        entity_count = 0
-        total_count = 0
-
-        log.info('Storing entity counts...')
-        with self.store.batched_inserter(250000) as s:
-            for entity, count in entity_count_iter:
-                entity_count += 1
-                total_count += count
-                
-                s.save({
-                    '_id': entity,
-                    'count': count
-                })
-                if entity_count % 250000 == 0:
-                    log.debug('Stored %i entity counts...', entity_count)
-
-        metadata_store.save({
-            '_id': self.mid,
-            'count': entity_count,
-            'total': total_count,
-            'created_at': get_timestamp()
-        })
-
-class NameProbability(object):
-    def __init__(self, tag):
-        self.mid = 'necounts[{:}]'.format(tag)
-        self.store = Store.Get('models:' + self.mid)
-
-    def iter_name_entities(self):
-        for ne in self.store.fetch_all():
-            yield ne['_id'], ne.get('entities', {}).iterkeys()
-
-    def probability(self, name, entity, candidates):
-        ecs = self.store.fetch(name) or {
-            'entities': {},
-            'total': .0
-        }
-
-        if entity in ecs['entities']:
-            return ecs['entities'][entity] / float(ecs['total'])
-        
-        return 1e-10
-
-    def is_zero(self, name):
-        return bool(self.store.fetch(name))
-
-    def create(self, name_entity_counts_iter):
-        metadata_store = Store.Get('models:meta')
-        
-        log.info('Flushing existing name-entity counts...')
-        self.store.flush()
-        metadata_store.delete(self.mid)
-
-        name_count = 0
-        name_entity_count = 0
-        with self.store.batched_inserter(250000) as s:
-            for name, entity_counts in name_entity_counts_iter:
-                name_count += 1
-                name_entity_count += len(entity_counts)
-
-                s.save({
-                    '_id': name,
-                    'entities': entity_counts,
-                    'total': sum(entity_counts.itervalues())
-                })
-
-                if name_count % 250000 == 0:
-                    log.debug('Stored %i name->entity counts...', name_entity_count)
-
-        log.info('Stored %i name-entity counts over %i names...', name_entity_count, name_count)
-
-        metadata_store.save({
-            '_id': self.mid,
-            'name_count': name_count,
-            'name_entity_count': name_entity_count,
-            'created_at': get_timestamp()
-        })
-
 class Entities(object):
     def __init__(self, tag):
         self.mid = 'entities[{:}]'.format(tag)
@@ -142,7 +38,7 @@ class Entities(object):
 
     def iter_entities(self):
         for entity in self.store.fetch_all():
-            yield entity['_id'], entity.get('label', ''), entity.get('description', '')
+            yield entity['_id'], entity.get('label', ''), entity.get('description', ''), entity.get('aliases', [])
 
     def create(self, iter_entities):
         metadata_store = Store.Get('models:meta')
@@ -153,11 +49,12 @@ class Entities(object):
 
         with self.store.batched_inserter(250000) as s:
             entity_count = 0
-            for eid, label, description in iter_entities:
-                s.save({
+            for eid, label, description, aliases in iter_entities:
+                s.append({
                     '_id': eid,
                     'label': label,
-                    'description': description
+                    'description': description,
+                    'aliases': aliases
                 })
 
                 entity_count += 1
@@ -201,7 +98,7 @@ class Candidates(object):
         with self.store.batched_inserter(250000) as s:
             for alias, entities in entities_by_name.iteritems():
                 count += 1
-                s.save({
+                s.append({
                     '_id': alias,
                     'entities': list(entities)
                 })
@@ -248,7 +145,7 @@ class Redirects(object):
         with self.store.batched_inserter(250000) as s:
             for source, target in source_target_iter:
                 count += 1
-                s.save({
+                s.append({
                     '_id': source,
                     'target': target
                 })
@@ -291,38 +188,109 @@ class EntityContext(object):
 
         return cossim
 
-class EntityTermFrequency(object):
+class EntityPrior(object):
+    """ Entity prior. """
     def __init__(self, tag):
-        self.mid = 'tfs[{:}]'.format(tag)
+        self.mid = 'ecounts[{:}]'.format(tag)
         self.store = Store.Get('models:' + self.mid)
+
+        metadata = Store.Get('models:meta').fetch(self.mid) or {}
+        self.entity_count = metadata.get('count', 0)
+        self.total = metadata.get('total', 0)
+
+    def count(self, entity):
+        item = self.store.fetch(entity) or {}
+        return item.get('count', 0)
+
+    def prior(self, entity):
+        "Return score for entity, default 1e-20."
+        count = float(self.count(entity))
+        return max(1e-20, count / self.total)
+
+    def create(self, entity_count_iter):
+        metadata_store = Store.Get('models:meta')
+
+        log.info('Flushing existing entity counts...')
+        self.store.flush()
+        metadata_store.delete(self.mid)
+
+        entity_count = 0
+        total_count = 0
+
+        log.info('Storing entity counts...')
+        with self.store.batched_inserter(250000) as s:
+            for entity, count in entity_count_iter:
+                entity_count += 1
+                total_count += count
+
+                s.append({
+                    '_id': entity,
+                    'count': count
+                })
+                if entity_count % 250000 == 0:
+                    log.debug('Stored %i entity counts...', entity_count)
+
+        metadata_store.save({
+            '_id': self.mid,
+            'count': entity_count,
+            'total': total_count,
+            'created_at': get_timestamp()
+        })
+
+class CountModel(object):
+    def __init__(self, mid, tag, uri=None):
+        self.mid = '{:}[{:}]'.format(mid, tag)
+        self.store = Store.Get('models:' + self.mid, uri=uri, flat=True)
+
+    def merge(self, oid_field_counts_iter):
+        self.store.inc_many(oid_field_counts_iter)
+
+    def get_count(self, oid, field):
+        return int(self.store.fetch_field(oid, field))
+
+    def get_counts(self, oid):
+        obj = self.store.fetch(oid)
+        return {} if obj == None else {f:int(v) for f,v in obj.iteritems() if f != '_id'}
+
+class NameProbability(CountModel):
+    def __init__(self, tag):
+        super(NameProbability, self).__init__('necounts', tag)
+
+    def iter_name_entities(self):
+        for ne in self.store.fetch_all():
+            name = ne.pop('_id')
+            yield name, ne.iterkeys()
+
+    def probability(self, name, entity, candidates):
+        ecs = self.store.get_counts(name) or {}
+
+        if entity in ecs:
+            return ecs[entity] / float(sum(ecs.itervalues()))
+
+        return 1e-10
+
+    def is_zero(self, name):
+        return bool(self.store.fetch(name))
+
+    def merge(self, name_entity_iter):
+        ne_counts = defaultdict(Counter)
+        for name, entity in name_entity_iter:
+            ne_counts[name][entity] += 1
+
+        log.debug('Accumulating %i name->entity counts...', len(name_entity_iter))
+        super(NameProbability, self).merge(ne_counts.iteritems())
+
+class EntityTermFrequency(CountModel):
+    def __init__(self, tag, uri=None):
+        super(EntityTermFrequency, self).__init__('tfs', tag, uri=uri)
 
     @lru_cache(maxsize=100000)
     def get_term_counts(self, entity):
-        return (self.store.fetch(entity) or {}).get('tfs', {})
+        return self.get_counts(entity)
 
-    def create(self, entity_tfs_iterator):
-        log.info("Dropping existing tfs...")
-        self.store.flush()
-
-        entity_count = 0
-        with self.store.batched_inserter(250000) as s:
-            for entity, tfs in entity_tfs_iterator:
-                s.save({
-                    '_id': entity,
-                    'tfs': tfs
-                })
-                entity_count += 1
-                if entity_count % 250000 == 0:
-                    log.debug('Stored term counts for %i entities...', entity_count)
-
-        log.info('Stored term counts for %i entities.', entity_count)
-
-        metadata_store = Store.Get('models:meta')
-        metadata_store.save({
-            '_id': self.mid,
-            'entity_count': entity_count,
-            'created_at': get_timestamp()
-        })
+    def merge(self, entity_term_counts_iter):
+        log.debug('Accumulating term counts over %i documents...', len(entity_term_counts_iter))
+        super(EntityTermFrequency, self).merge(entity_term_counts_iter)
 
 class TermDocumentFrequency(object):
     def __init__(self, tag):
@@ -332,6 +300,11 @@ class TermDocumentFrequency(object):
         metadata_store = Store.Get('models:meta')
         metadata = metadata_store.fetch(self.mid) or {}
         self.total_docs = metadata.get('total_docs', 0)
+
+    def iter_most_frequent_terms(self, limit):
+        df_term_iter = ((obj['df'],obj['_id']) for obj in self.store.fetch_all())
+        for _, term in sorted(df_term_iter, reverse=True)[:limit]:
+            yield term
 
     @lru_cache(maxsize=500000)
     def idf(self, term):
@@ -347,7 +320,7 @@ class TermDocumentFrequency(object):
         count = 0
         with self.store.batched_inserter(250000) as s:
             for term, df in term_df_iterator:
-                s.save({
+                s.append({
                     '_id': term,
                     'df': df
                 })
@@ -388,97 +361,50 @@ class LinearClassifier(object):
         Store.Get(cls.mid).save(model)
 
 class EntityCooccurrence(object):
-    def __init__(self, cooccurrence_counts = None, occurrence_counts = None):
-        self.cooccurrence_counts = cooccurrence_counts or {}
-        self.occurrence_counts = occurrence_counts or {}
+    def __init__(self, tag, store_uri = None):
+        self.mid = 'eco[{:}]'.format(tag)
+        self.store = Store.Get('models:' + self.mid, flat=True, uri=store_uri)
 
-    def cooccurrence_count(self, a, b):
-        if a > b:
-            a, b = b, a
+    def _obj_to_cooccurrence_counts(self, obj):
+        return {k:float(v) for k, v in obj if k != '_id'}
 
-        # this crazy stacked dictionary method turns out to be much, much more memory/time efficient
-        # than using the frozensets of entity pairs for the key.
-        # perhaps because memory allocation for the dict blows up when you have lots of keys
-        return self.cooccurrence_counts.get(a, {}).get(b, 0)
+    def cooccurrence_counts(self, entity):
+        return self._obj_to_cooccurrence_counts(self.store.fetch(entity))
 
-    def conditional_probability(self, a, b):
-        intersection = self.cooccurrence_count(a, b)
-        return 0.0 if intersection == 0 else intersection / self.occurrence_counts[b]
+    def iter_cooccurrence_counts(self, entities):
+        for obj in self.store.fetch_many(entities):
+            yield self._obj_to_cooccurrence_counts(obj)
 
-    def write(self, path):
-        log.info('Writing cooccurrence model to file: %s' % path)
-        with open(path, 'wb') as f:
-            marshal.dump(self.cooccurrence_counts, f)
-            marshal.dump(self.occurrence_counts, f)
+    def map_entity_to_field(self, entity):
+        return entity.replace('.', u'\u2024').replace('$', u'\uff04')
+    def map_field_to_entity(self, field):
+        return entity.replace(u'\u2024', '.').replace(u'\uff04', '$')
 
-    @staticmethod
-    def read(path):
-        log.info('Reading entity cooccurrence model from file: %s' % path)
+    def merge(self, entity_sets_iter):
+        cm = defaultdict(lambda: defaultdict(int))
 
-        with open(path, 'rb') as f:
-            cooccurrence_counts = marshal.load(f)
-            occurrence_counts = marshal.load(f)
+        for entities in entity_sets_iter:
+            for i in xrange(0, len(entities)):
+                for j in xrange(i, len(entities)):
+                    a, b = entities[i], entities[j]
+                    cm[a][b] += 1
 
-        return EntityCooccurrence(cooccurrence_counts, occurrence_counts)
+                    # note that we DO include the i==j case, we're just not counting it twice
+                    # this means that the number of times an entity 'cooccurs' with itself is actually
+                    # its occurrence count, which is a useful statistic for both P(e) and P(e|e') models
+                    if a != b:
+                        cm[b][a] += 1
+
+        log.debug('Merging cooccurrence counts for %i entity sets...', len(entity_sets_iter))
+        self.store.inc_many(
+            (a, ((self.map_entity_to_field(b), count) for b, count in bs.iteritems()))
+            for a, bs in cm.iteritems())
+        log.debug('Done...')
 
 class EntityOccurrence(object):
-    "Inlinks to an entity article."
-    SIZEW = 4527417 # http://en.wikipedia.org/wiki/Wikipedia:Size_of_Wikipedia
-    LOGW = math.log(SIZEW)
-
-    def __init__(self, entity_occurences = None):
-        self.d = {} if entity_occurences == None else entity_occurences
-
-    def add(self, entity, url):
-        self.d.setdefault(entity, set()).add(url)
-
-    def occurrences(self, entity):
-        return self.d.get(entity, set())
-
-    @lru_cache(maxsize=1000000)
-    def entity_relatedness(self, a, b):
-        """ Milne relatedness of two entities. """
-        occ_a = self.occurrences(a)
-        occ_b = self.occurrences(b)
-        occ_common = occ_a.intersection(occ_b)
-
-        try:
-            logmax = max(len(occ_a), len(occ_b))
-            logmin = min(len(occ_a), len(occ_b))
-            logint = len(occ_common)
-            return (logmax - logint) / (self.LOGW - logmin)
-        except ValueError:
-            return 0.0
-
-    def tagme_vote(self, e1, candidate_set):
-        """
-        Return score for entity e1 based on another anchor's candidates
-        (Ferragina & Scaiella, 2010).
-        NOTE: For F&S, candidates should have p(entity|name) scores.
-        candidate_set - set of (score, entity) tuples
-        """
-        try:
-            return sum([self.entity_relatedness(e1, e2) * score
-                        for score, e2 in candidate_set]) / len(candidate_set)
-        except ZeroDivisionError:
-            return 0.0
-
-    def tagme_score(self, e1, candidate_sets):
-        """
-        Return total relevance for entity e1 across other anchors
-        (Ferragina & Scaiella, 2010).
-        candidate_sets - list of candidate sets, unique by anchor
-        """
-        return sum([self.tagme_vote(e1, a2) for a2 in candidate_sets], 0.0)
-
-    def write(self, path):
-        log.info('Writing occurrence model to file: %s' % path)
-        marshal.dump(self.d, open(path, 'wb'))
-
-    @staticmethod
-    def read(path):
-        log.info('Reading entity occurrence model from file: %s' % path)
-        return EntityOccurrence(marshal.load(open(path, 'rb')))
+    def __init__(self):
+        # todo: needs re-implementation for store api
+        raise NotImplementedError
 
 class Links(object):
     "Outlinks from entity article."

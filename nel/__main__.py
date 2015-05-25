@@ -42,12 +42,9 @@ APPS = [
     kopi.BuildKopiWikiEntityContext,
     
     derived.BuildLinkModels,
-    derived.BuildContextModels,
-    derived.BuildEntitySet,
-    derived.BuildIdfsForEntityContext,
-    derived.BuildOccurrenceFromMentions,
-    derived.BuildOccurrenceFromLinks,
-    derived.BuildEntityCooccurrenceFromOccurrence,
+    derived.BuildTermDocumentFrequencyModel,
+    derived.BuildTermFrequencyModel,
+    derived.BuildMentionModel,
     derived.BuildCandidateModel,
     
     tac.BuildTacRedirects,
