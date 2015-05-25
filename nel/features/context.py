@@ -3,7 +3,6 @@ import operator
 import re
 import math
 import numpy
-import logging
 import random
 
 from functools32 import lru_cache
@@ -11,7 +10,9 @@ from collections import Counter
 
 from .feature import Feature
 from ..model.model import mmdict, WordVectors
+from ..model import model
 
+import logging
 log = logging.getLogger()
 
 from scipy.spatial.distance import cosine as dense_cosine_distance
@@ -32,49 +33,24 @@ def sparse_cosine_distance(a, b):
 @Feature.Extractable
 class BoWMentionContext(Feature):
     """ Bag of Words similarity """
-    EXCLUDED_LOW_IDF_TERMS = 40
-    def __init__(self, query_ctx_window, idf_model_path, entity_ctx_model_path):
-        self.tag = entity_ctx_model_path.split('.')[0] # todo: parameterise tag
-        self.query_window = None if query_ctx_window.lower() == 'full' else int(query_ctx_window)
-        idfs = mmdict(idf_model_path)
-        self.context_model = mmdict(entity_ctx_model_path)
-
-        vocab_exclude_re = re.compile("^([0-9])+")
-        idfs = {t:idf for t,idf in idfs.iteritems() if not vocab_exclude_re.match(t)}
-        sorted_idfs = sorted((idf, t) for t, idf in idfs.iteritems())[self.EXCLUDED_LOW_IDF_TERMS:]
-        self.vocab = {t:(i,idf) for i, (idf, t) in enumerate(sorted_idfs)}
-        
-        log.debug("Mention context feature (vocab size=%i) (query window=%s)" % (len(sorted_idfs), str(self.query_window)))
+    def __init__(self, context_model_tag):
+        self.ctx_model = model.EntityContext(context_model_tag)
+        self.tag = context_model_tag
+        self.tokenise = RegexTokeniser(TOKEN_RE)
 
     def counts_to_bow(self, counts):
         """ Convert term counts to a TF-IDF weighted Bag of Words """
-        bow = {}
-        for t, count in counts.iteritems():
-            if t in self.vocab:
-                _, idf = self.vocab[t]
-                bow[t] = math.sqrt(count) * idf
-        return bow
+        return self.ctx_model.get_bow(counts.iteritems())
 
     @staticmethod
     def ngrams(tokens, n, vocab):
-        num_tokens = len(tokens)
-        for i in xrange(num_tokens):
-            for j in xrange(i+1, min(num_tokens, i+n)+1):
-                ngram = '_'.join(tokens[i:j])  # mikolov style
-                if ngram in vocab:
-                    yield ngram
-                else:
-                    # back off to a normalised version, might also try stemming
-                    normalised = ngram.lower()
-                    if normalised in vocab:
-                        yield normalised
+        return [t.lower() for t in tokens]
 
     def tokens_to_bow_vector(self, tokens):
-        return self.counts_to_bow(Counter(self.ngrams(tokens, 3, self.vocab)))
+        return self.counts_to_bow(Counter(self.ngrams(tokens, 1, None)))
 
-    @lru_cache(maxsize=5000)
     def get_entity_context_vec(self, entity):
-        return self.counts_to_bow(self.context_model[entity])
+        return self.ctx_model.get_entity_bow(entity)
 
     def default_distance(self):
         return 1.0
@@ -82,35 +58,22 @@ class BoWMentionContext(Feature):
     def distance(self, query, entity):
         if not query or not entity:
             return self.default_distance()
-
         return sparse_cosine_distance(query, entity)
 
     def compute_doc_state(self, doc):
-        return self.tokens_to_bow_vector(doc.text.split())
- 
-    def compute(self, doc, chain, candidate, doc_bow):
-        # figure out what set of query doc tokens we need to inspect
-        query_context_vec = doc_bow
+        candidates = set(c.id for chain in doc.chains for c in chain.candidates)
+        candidate_bows = [(c, self.get_entity_context_vec(c)) for c in candidates]
+        doc_bow = self.tokens_to_bow_vector(doc.text.split())
 
-        if query_context_vec == None:
-            log.debug('No query context for doc: %s' % doc.id)
+        # compute these ahead of time to avoid redundant similarity comparisons
+        return {c:self.distance(doc_bow, entity_bow) for c,entity_bow in candidate_bows}
 
-        distance = self.default_distance()
-
-        if query_context_vec != None and candidate.id in self.context_model:
-            entity_context_vec = self.get_entity_context_vec(candidate.id)
-
-            if entity_context_vec != None:
-                if len(query_context_vec) != 0 and len(entity_context_vec) != 0:
-                    distance = self.distance(query_context_vec, entity_context_vec)
-
-        return distance
+    def compute(self, doc, chain, candidate, candidate_sim):
+        return candidate_sim[candidate.id]
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('query_ctx_window', metavar='QRY_CTX_WINDOW')
-        p.add_argument('idf_model_path', metavar='IDF_MODEL')
-        p.add_argument('entity_ctx_model_path', metavar='ENTITY_CONTEXT_MODEL')
+        p.add_argument('context_model_tag', metavar='CONTEXT_MODEL')
         p.set_defaults(featurecls=cls)
         return p
 
