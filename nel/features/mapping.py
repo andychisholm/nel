@@ -14,6 +14,9 @@ class FeatureMapper(object):
                 c.fv = self.map(numpy.array([c.features[f] for f in self.features]))
         return doc
 
+    def feature_vector_length(self):
+        raise NotImplementedError
+
 class ZeroMeanUnitVarianceMapper(FeatureMapper):
     def __init__(self, features, means, stds):
         super(ZeroMeanUnitVarianceMapper,self).__init__(features)
@@ -22,6 +25,9 @@ class ZeroMeanUnitVarianceMapper(FeatureMapper):
 
     def map(self, fv):
         return (fv - self.mean) / self.std
+
+    def feature_vector_length(self):
+        return len(self.features)
 
 class PolynomialMapper(ZeroMeanUnitVarianceMapper): 
     def __init__(self, features, means, stds):
@@ -37,5 +43,9 @@ class PolynomialMapper(ZeroMeanUnitVarianceMapper):
                 fv.append(weight * fv[i]*fv[j])
         
         return numpy.array(fv)
+
+    def feature_vector_length(self):
+        n = len(self.features)
+        return n + n*(n+1)/2
 
 FEATURE_MAPPERS = {cls.__name__:cls for cls in [ZeroMeanUnitVarianceMapper,PolynomialMapper]}
