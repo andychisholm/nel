@@ -246,11 +246,16 @@ class CountModel(object):
         self.store.inc_many(oid_field_counts_iter)
 
     def get_count(self, oid, field):
-        return int(self.store.fetch_field(oid, field))
+        value = self.store.fetch_field(oid, field)
+        return int(value) if value != None else 0
 
     def get_counts(self, oid):
         obj = self.store.fetch(oid)
         return {} if obj == None else {f:int(v) for f,v in obj.iteritems() if f != '_id'}
+
+    @lru_cache(maxsize=10000)
+    def get_total(self, oid):
+        return float(sum(self.get_counts(oid).itervalues()))
 
 class NameProbability(CountModel):
     def __init__(self, tag):
@@ -262,11 +267,10 @@ class NameProbability(CountModel):
             yield name, ne.iterkeys()
 
     def probability(self, name, entity, candidates):
-        ecs = self.store.get_counts(name) or {}
+        count = self.get_count(name, entity)
 
-        if entity in ecs:
-            return ecs[entity] / float(sum(ecs.itervalues()))
-
+        if count != 0:
+            return count / self.get_total(name)
         return 1e-10
 
     def is_zero(self, name):
