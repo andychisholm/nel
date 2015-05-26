@@ -36,7 +36,6 @@ class BoWMentionContext(Feature):
     def __init__(self, context_model_tag):
         self.ctx_model = model.EntityContext(context_model_tag)
         self.tag = context_model_tag
-        self.tokenise = RegexTokeniser(TOKEN_RE)
 
     def counts_to_bow(self, counts):
         """ Convert term counts to a TF-IDF weighted Bag of Words """
