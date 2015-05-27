@@ -61,7 +61,7 @@ def trim_subsection_link(s):
     return s if idx == -1 else s[:idx]
 
 def normalise_wikipedia_link(s):
-    s = s.replace(' ', '_').strip('_')
+    s = s.replace(' ', '_').strip('_').strip()
     if s and s[0].islower():
         s = s[0].upper() + s[1:]
     return s
