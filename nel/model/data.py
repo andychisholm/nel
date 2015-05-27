@@ -90,11 +90,20 @@ class RedisStore(Store):
     def to_oid(self, key):
         return key[len(self.ns)+1:].decode('utf-8')
 
+    def _fetch_batch(self, keys_iter):
+        raise NotImplementedError
+
     def fetch_many(self, oids):
         return self._fetch_batch(self.to_key(oid) for oid in oids)
 
-    def _fetch_batch(self, keys_iter):
-        raise NotImplementedError
+    def fetch_all(self):
+        keys = self.keys()
+        keys_iter = islice(keys, None)
+        if keys:
+            batch_sz = 100000
+            for _ in xrange(0, len(keys), batch_sz):
+                for obj in self._fetch_batch(islice(keys_iter, batch_sz)):
+                    yield obj
 
     def iter_ids(self):
         for key in self.keys():
@@ -146,15 +155,6 @@ class SerialisedRedisStore(RedisStore):
         # this is an inefficient operation for serialised redis stores
         return self.fetch(oid).get(field, None)
 
-    def fetch_all(self):
-        keys = self.keys()
-        keys_iter = islice(keys, None)
-        if keys:
-            batch_sz = 100000
-            for _ in xrange(0, len(keys), batch_sz):
-                for obj in self._fetch_batch(islice(keys_iter, batch_sz)):
-                    yield obj
-
     def save(self, obj):
         key = self.to_key(obj['_id'])
         data = self.serialise(obj)
@@ -185,7 +185,7 @@ class HashedRedisStore(RedisStore):
             keys = list(keys_iter)
             for key in keys:
                 p.hgetall(key)
-            for key, obj in izip(keys, pipeline.execute()):
+            for key, obj in izip(keys, p.execute()):
                 obj['_id'] = self.to_oid(key)
                 yield obj
 
