@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 import argparse
 import textwrap
+import numpy
 
 from pymongo import MongoClient
 
@@ -17,13 +19,53 @@ class PrepareCorpus(object):
         log.info("Dropping existing %s document...", self.corpus_id)
         self.store.drop()
 
+        # mention statistics
+        total_non_nil = 0
+        total_candidate_recalled = 0
+        chain_mention_counts = []
+        chain_candidate_counts = []
+
         log.info('Loading documents for corpus %s...', self.corpus_id)
         for i, doc in enumerate(self.parse()):
             if i % 100 == 0:
                 log.debug('Processed %i documents...', i)
+
+            # accumulate mention statistics
+            for chain in doc.chains:
+                chain_mention_counts.append(len(chain.mentions))
+                chain_candidate_counts.append(len(chain.candidates))
+                if chain.resolution != None:
+                    total_non_nil += len(chain.mentions)
+                    if chain.resolution.id in [c.id for c in chain.candidates]:
+                        total_candidate_recalled += len(chain.mentions)
+                    else:
+                        log.warn('No candidate for chain: %s - %s', chain.resolution.id, ', '.join(set("'" + m.text.lower() + "'" for m in chain.mentions)))
+
             self.store.insert(doc.json())
 
-        log.info('Import completed for %i documents.', i)
+        total_chains = len(chain_mention_counts)
+        total_mentions = sum(chain_mention_counts)
+
+        section_delimiter = '-' * 40
+        log.info(section_delimiter)
+        log.info('CORPUS STATISTICS')
+        log.info(section_delimiter)
+        log.info('Total mentions           = %i', total_mentions)
+        log.info('Total nil mentions (%%)   = %i (%.2f)', total_mentions - total_non_nil, float(total_mentions - total_non_nil) / total_mentions)
+
+        log.info(section_delimiter)
+        log.info('Total chains             = %i', total_chains)
+        log.info('Mentions per Chain (σ)   = %.1f (%.2f)', numpy.mean(chain_mention_counts), numpy.std(chain_mention_counts))
+
+        log.info(section_delimiter)
+        log.info('Candidates per Chain (σ) = %.1f (%.2f)', numpy.mean(chain_candidate_counts), numpy.std(chain_candidate_counts))
+
+        no_candidates_count = sum(1 for c in chain_candidate_counts if c == 0)
+        log.info('Candidate Recall (%%)     = %.2f', float(total_candidate_recalled) / total_non_nil)
+        log.info('Nil Candidate Chains (%%) = %i (%.2f)', no_candidates_count, float(no_candidates_count) / total_chains)
+        log.info(section_delimiter)
+
+        log.info('Import completed for %i documents.', i+1)
 
     APPS=set()
     @classmethod
