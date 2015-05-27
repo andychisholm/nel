@@ -8,6 +8,7 @@ from ..model.model import Redirects
 from ..process.tag import Tagger, StanfordTagger, CandidateGenerator
 from ..process.tokenise import RegexTokeniser, TOKEN_RE
 from ..harness.format import markdown_to_whitespace
+from ..model.prepare.util import normalise_wikipedia_link
 
 import logging
 log = logging.getLogger()
@@ -27,11 +28,17 @@ class MarkdownPrepare(object):
         with open(self.annotations_path, 'r') as f:
             for line in f:
                 parts = line.decode(ENC).strip().split('\t')
+
+                resolution_id = None
+                if len(parts) > 3:
+                    resolution_id = normalise_wikipedia_link(parts[3])
+                    resolution_id = self.redirect_model.map(resolution_id)
+
                 yield {
                     'doc': parts[0],
                     'span': slice(int(parts[1]), int(parts[2])),
                     'resolution': {
-                        'id': self.redirect_model.map(parts[3]) if len(parts) > 3 else None
+                        'id': resolution_id
                     }
                 }
 
@@ -82,9 +89,10 @@ class MarkdownPrepare(object):
                 doc.chains = unique_chains
             else:
                 doc = tagger(tokeniser(doc))
-            
+
             doc = generate_candidates(doc)
-            
+            doc.tag = 'dev' # todo: need custom logic here
+
             yield doc
 
     @classmethod
