@@ -61,7 +61,8 @@ class PrepareCorpus(object):
         log.info('Candidates per Chain (σ) = %.1f (%.2f)', numpy.mean(chain_candidate_counts), numpy.std(chain_candidate_counts))
 
         no_candidates_count = sum(1 for c in chain_candidate_counts if c == 0)
-        log.info('Candidate Recall (%%)     = %.2f', float(total_candidate_recalled) / total_non_nil)
+        candidate_recall = 'n/a' if total_non_nil == 0 else '%.2f' % (float(total_candidate_recalled) / total_non_nil)
+        log.info('Candidate Recall (%%)     = %s', candidate_recall)
         log.info('Nil Candidate Chains (%%) = %i (%.2f)', no_candidates_count, float(no_candidates_count) / total_chains)
         log.info(section_delimiter)
 
