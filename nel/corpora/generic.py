@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from .prepare import PrepareCorpus
 from ..doc import Doc, Chain, Mention, Candidate
-from ..model.model import Redirects
+from ..model.model import Entities, Redirects
 from ..process.tag import Tagger, StanfordTagger, CandidateGenerator
 from ..process.tokenise import RegexTokeniser, TOKEN_RE
 from ..harness.format import markdown_to_whitespace
@@ -18,9 +18,11 @@ ENC = 'utf8'
 @PrepareCorpus.Register
 class MarkdownPrepare(object):
     """ Injest a set of markdown documents with neleval formatted annotations """
-    def __init__(self, docs_path, annotations_path, redirect_model_tag, use_gold_mentions):
+    def __init__(self, docs_path, annotations_path, entity_model_tag, candidate_model_tag, redirect_model_tag, use_gold_mentions):
         self.docs_path = docs_path
         self.annotations_path = annotations_path
+        self.entity_model = Entities(entity_model_tag)
+        self.candidate_generator = CandidateGenerator(candidate_model_tag)
         self.redirect_model = Redirects(redirect_model_tag)
         self.use_gold_mentions = use_gold_mentions
 
@@ -33,6 +35,9 @@ class MarkdownPrepare(object):
                 if len(parts) > 3:
                     resolution_id = normalise_wikipedia_link(parts[3])
                     resolution_id = self.redirect_model.map(resolution_id)
+                    if self.entity_model.get(resolution_id) == None:
+                        log.debug('Filtering out-of-KB entity: %s', resolution_id)
+                        resolution_id = None
 
                 yield {
                     'doc': parts[0],
@@ -61,8 +66,6 @@ class MarkdownPrepare(object):
         for m in self.iter_mentions():
             mentions_by_doc[m['doc']].append(m)
 
-        # todo: parameterise tagger/candidate gen config
-        generate_candidates = CandidateGenerator('wikipedia')
         if not self.use_gold_mentions:
             tokeniser = RegexTokeniser(TOKEN_RE)
             tagger = StanfordTagger(host='127.0.0.1', port=1447)
@@ -90,8 +93,10 @@ class MarkdownPrepare(object):
             else:
                 doc = tagger(tokeniser(doc))
 
-            doc = generate_candidates(doc)
-            doc.tag = 'dev' # todo: need custom logic here
+            doc = self.candidate_generator(doc)
+
+            # todo: may need custom logic here depending on the corpus
+            doc.tag = 'dev'
 
             yield doc
 
@@ -99,6 +104,8 @@ class MarkdownPrepare(object):
     def add_arguments(cls, p):
         p.add_argument('docs_path', metavar='SOURCE_DOCS_PATH')
         p.add_argument('annotations_path', metavar='ANNOTATIONS_TSV_PATH')
+        p.add_argument('entity_model_tag', metavar='ENTITY_MODEL')
+        p.add_argument('candidate_model_tag', metavar='CANDIDATE_MODEL')
         p.add_argument('--redirect_model_tag', default='wikipedia', required=False, metavar='REDIRECT_MODEL')
         p.add_argument('--use_gold_mentions', action='store_true')
         p.set_defaults(use_gold_mentions=False)
