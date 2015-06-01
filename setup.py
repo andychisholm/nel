@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-__version__ = '0.1.6'
+__version__ = '0.1.6-r1'
 __pkg_name__ = 'nel'
 
 setup(

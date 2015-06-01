@@ -37,6 +37,7 @@ class Tagger(Process):
                         chain.insert(0, m)
                         unchained_mentions.remove(m)
                         likely_acronym = True
+                potential_antecedents = [(m.text, m) for m in unchained_mentions]
 
             last = None
             longest_mention = mention
