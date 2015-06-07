@@ -12,11 +12,7 @@ from collections import defaultdict, Counter
 from schwa import dr
 from .. import model
 from .. import data
-from ..model import Redirects
 from ..model import WordVectors
-from ..model import EntityMentionContexts
-from ..model import mmdict
-from ..model import Links
 from ..model import EntityOccurrence, EntityCooccurrence
 from ..model import Candidates
 
@@ -206,6 +202,7 @@ class BuildTermFrequencyModel(MRCorpusProcessor):
         start_time = time()
 
         tf_model = model.EntityTermFrequency(self.model_tag, uri='mongodb://localhost')
+        log.info('Flushing existing tf counts...')
         tf_model.store.flush()
 
         dfs = Counter()
@@ -229,10 +226,9 @@ class BuildCandidateModel(object):
     def __init__(self, entities_model_tag, redirect_model_tag, name_model_tag, model_tag):
         self.name_model_tag = name_model_tag
         self.model_tag = model_tag
-
         self.underscores_re = re.compile('_+')
 
-        self.redirects = Redirects(redirect_model_tag, prefetch=True)
+        self.redirects = model.Redirects(redirect_model_tag, prefetch=True)
 
         log.info('Pre-fetching kb entity set...')
         self.entities_model = model.Entities(entities_model_tag)

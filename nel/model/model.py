@@ -2,20 +2,15 @@
 from __future__ import print_function
 from collections import Counter, defaultdict
 from functools32 import lru_cache
-from .data import Store
 
 import itertools
-import marshal
-import operator
-import cPickle as pickle
 import numpy as np
 import math
-import os
 import logging
-import mmap
 from time import time
 from datetime import datetime
 
+from .data import ObjectStore, FieldStore, SetStore
 from ..features.mapping import FEATURE_MAPPERS
 
 log = logging.getLogger()
@@ -28,7 +23,7 @@ def get_timestamp():
 class Entities(object):
     def __init__(self, tag):
         self.mid = 'entities[{:}]'.format(tag)
-        self.store = Store.Get('models:' + self.mid)
+        self.store = ObjectStore.Get('models:' + self.mid)
 
     def get(self, entity):
         return self.store.fetch(entity)
@@ -41,7 +36,7 @@ class Entities(object):
             yield entity['_id'], entity.get('label', ''), entity.get('description', ''), entity.get('aliases', [])
 
     def create(self, iter_entities):
-        metadata_store = Store.Get('models:meta')
+        metadata_store = ObjectStore.Get('models:meta')
 
         log.info('Flushing existing entities...')
         self.store.flush()
@@ -72,7 +67,7 @@ class Entities(object):
 class Candidates(object):
     def __init__(self, tag):
         self.mid = 'aliases[{:}]'.format(tag)
-        self.store = Store.Get('models:' + self.mid)
+        self.store = ObjectStore.Get('models:' + self.mid)
 
     def search(self, alias):
         res = self.store.fetch(alias.lower())
@@ -107,7 +102,7 @@ class Candidates(object):
 
         log.info('Stored %i candidate sets', count)
 
-        metadata_store = Store.Get('models:meta')
+        metadata_store = ObjectStore.Get('models:meta')
         metadata_store.save({
             '_id': self.mid,
             'total_aliases': count,
@@ -117,7 +112,7 @@ class Candidates(object):
 class Redirects(object):
     def __init__(self, tag, prefetch = False):
         self.mid = 'redirects[{:}]'.format(tag)
-        self.store = Store.Get('models:' + self.mid)
+        self.store = ObjectStore.Get('models:' + self.mid)
 
         self.cache = None
         if prefetch:
@@ -154,7 +149,7 @@ class Redirects(object):
 
         log.info('Stored %i redirects...', count)
 
-        metadata_store = Store.Get('models:meta')
+        metadata_store = ObjectStore.Get('models:meta')
         metadata_store.save({
             '_id': self.mid,
             'total_redirects': count,
@@ -163,7 +158,7 @@ class Redirects(object):
 
 class EntityContext(object):
     def __init__(self, tag):
-        self.tf_model = EntityTermFrequency(tag)
+        self.tf_model = EntityTermFrequency(tag, uri='mongodb://localhost')
         self.df_model = TermDocumentFrequency(tag)
 
     def get_bow(self, tf_iter):
@@ -192,9 +187,9 @@ class EntityPrior(object):
     """ Entity prior. """
     def __init__(self, tag):
         self.mid = 'ecounts[{:}]'.format(tag)
-        self.store = Store.Get('models:' + self.mid)
+        self.store = ObjectStore.Get('models:' + self.mid)
 
-        metadata = Store.Get('models:meta').fetch(self.mid) or {}
+        metadata = ObjectStore.Get('models:meta').fetch(self.mid) or {}
         self.entity_count = metadata.get('count', 0)
         self.total = metadata.get('total', 0)
 
@@ -208,7 +203,7 @@ class EntityPrior(object):
         return max(1e-20, count / self.total)
 
     def create(self, entity_count_iter):
-        metadata_store = Store.Get('models:meta')
+        metadata_store = ObjectStore.Get('models:meta')
 
         log.info('Flushing existing entity counts...')
         self.store.flush()
@@ -240,7 +235,7 @@ class EntityPrior(object):
 class CountModel(object):
     def __init__(self, mid, tag, uri=None):
         self.mid = '{:}[{:}]'.format(mid, tag)
-        self.store = Store.Get('models:' + self.mid, uri=uri, flat=True)
+        self.store = FieldStore.Get('models:' + self.mid, uri=uri)
 
     def merge(self, oid_field_counts_iter):
         self.store.inc_many(oid_field_counts_iter)
@@ -250,8 +245,8 @@ class CountModel(object):
         return int(value) if value != None else 0
 
     def get_counts(self, oid):
-        obj = self.store.fetch(oid)
-        return {} if obj == None else {f:int(v) for f,v in obj.iteritems() if f != '_id'}
+        fvs = self.store.fetch_fields(oid)
+        return {} if fvs == None else {f:int(v) for f,v in fvs.iteritems()}
 
     @lru_cache(maxsize=10000)
     def get_total(self, oid):
@@ -274,7 +269,7 @@ class NameProbability(CountModel):
         return 1e-10
 
     def is_zero(self, name):
-        return bool(self.store.fetch(name))
+        return not self.store.exists(name)
 
     def merge(self, name_entity_iter):
         ne_counts = defaultdict(Counter)
@@ -299,9 +294,9 @@ class EntityTermFrequency(CountModel):
 class TermDocumentFrequency(object):
     def __init__(self, tag):
         self.mid = 'df[{:}]'.format(tag)
-        self.store = Store.Get('models:' + self.mid)
-        
-        metadata_store = Store.Get('models:meta')
+        self.store = ObjectStore.Get('models:' + self.mid)
+
+        metadata_store = ObjectStore.Get('models:meta')
         metadata = metadata_store.fetch(self.mid) or {}
         self.total_docs = metadata.get('total_docs', 0)
 
@@ -334,7 +329,7 @@ class TermDocumentFrequency(object):
 
         log.info('Stored %i term dfs.', count)
 
-        metadata_store = Store.Get('models:meta')
+        metadata_store = ObjectStore.Get('models:meta')
         metadata_store.save({
             '_id': self.mid,
             'total_docs': total_docs,
@@ -345,7 +340,7 @@ class LinearClassifier(object):
     mid = 'models:classifiers'
     def __init__(self, name):
         self.name = name
-        model = Store.Get(self.mid).fetch(name)
+        model = ObjectStore.Get(self.mid).fetch(name)
         if model:
             self.weights = np.array(model['weights'])
             self.intercept = model['intercept']
@@ -362,30 +357,17 @@ class LinearClassifier(object):
         model = dict(model)
         model['_id'] = name
         model['created_at'] = get_timestamp()
-        Store.Get(cls.mid).save(model)
+        ObjectStore.Get(cls.mid).save(model)
 
-class EntityCooccurrence(object):
-    def __init__(self, tag, store_uri = None):
-        self.mid = 'eco[{:}]'.format(tag)
-        self.store = Store.Get('models:' + self.mid, flat=True, uri=store_uri)
-
-    def _obj_to_cooccurrence_counts(self, obj):
-        return {k:float(v) for k, v in obj if k != '_id'}
+class EntityCooccurrence(CountModel):
+    def __init__(self, tag, uri = None):
+        super(EntityCooccurrence, self).__init__('eco', tag, uri=uri)
 
     def cooccurrence_counts(self, entity):
-        return self._obj_to_cooccurrence_counts(self.store.fetch(entity))
-
-    def iter_cooccurrence_counts(self, entities):
-        for obj in self.store.fetch_many(entities):
-            yield self._obj_to_cooccurrence_counts(obj)
-
-    def map_entity_to_field(self, entity):
-        return entity.replace('.', u'\u2024').replace('$', u'\uff04')
-    def map_field_to_entity(self, field):
-        return entity.replace(u'\u2024', '.').replace(u'\uff04', '$')
+        return self.get_counts(entity)
 
     def merge(self, entity_sets_iter):
-        cm = defaultdict(lambda: defaultdict(int))
+        cm = defaultdict(Counter)
 
         for entities in entity_sets_iter:
             for i in xrange(0, len(entities)):
@@ -400,38 +382,15 @@ class EntityCooccurrence(object):
                         cm[b][a] += 1
 
         log.debug('Merging cooccurrence counts for %i entity sets...', len(entity_sets_iter))
-        self.store.inc_many(
-            (a, ((self.map_entity_to_field(b), count) for b, count in bs.iteritems()))
-            for a, bs in cm.iteritems())
-        log.debug('Done...')
+        super(EntityCooccurrence, self).merge(cm.iteritems())
 
 class EntityOccurrence(object):
-    def __init__(self):
-        # todo: needs re-implementation for store api
-        raise NotImplementedError
+    def __init__(self, tag, store_uri = None):
+        self.mid = 'inlinks[{:}]'.format(tag)
+        self.store = SetStore.Get('models:' + self.mid, uri=store_uri)
 
-class Links(object):
-    "Outlinks from entity article."
-    def __init__(self, outlinks = None):
-        self.d = {} if outlinks == None else outlinks
-
-    def get(self, source):
-        return self.d.get(source, set())
-
-    def update(self, source, target):
-        self.d.setdefault(source, set()).add(target)
-
-    def iteritems(self):
-        return self.d.iteritems()
-    
-    def write(self, path):
-        log.info('Writing links model to file: %s' % path)
-        marshal.dump(self.d, open(path, 'wb'))
-
-    @staticmethod
-    def read(path):
-        log.info('Reading links model from file: %s' % path)
-        return Links(marshal.load(open(path, 'rb')))
+    def merge(self, entity_occurrence_iter):
+        self.store.union_many(entity_occurrence_iter)
 
 class WordVectors(object):
     def __init__(self, vocab, vectors):
@@ -460,198 +419,3 @@ class WordVectors(object):
         log.debug('Loading word vector model from: %s', model_path)
         with open(model_path, 'rb') as f:
             return WordVectors(marshal.load(f), np.load(f))
-
-class EntityTermCounts(object):
-    "Model of term counts for a set of entities."
-    def __init__(self):
-        self.entity_term_counts = defaultdict(dict)
-
-    def update(self, entity, term, count):
-        self.entity_term_counts[entity][term] = count
-
-    def get(self, entity, term):
-        if entity not in self.entity_term_counts:
-            return 0.0
-        
-        return self.entity_term_counts[entity].get(term, 0.0)
-
-    def get_terms(self, entity):
-        return self.entity_term_counts[entity]
-
-    def write(self, path):
-        "Write model to file."
-        
-        log.debug('Writing term frequency model to file: %s ...' % path)
-
-        with open(path, 'wb') as f:
-            for entity, counts in self.entity_term_counts.iteritems():
-                marshal.dump((entity, counts), f)
-
-    def read(self, path):
-        "Read model from file."
-
-        log.debug('Loading raw model from file: %s ...' % path)
-
-        with open(path, 'rb') as fh:
-            while True:
-                try:
-                    entity, counts = marshal.load(fh)
-                    self.entity_term_counts[entity] = counts
-                except EOFError: break
-
-class mmdict(object):
-    def __init__(self, path):
-        self.path = path
-        self.index = {}
-        
-        index_path = self.path + '.index'
-        log.debug('Loading mmap store: %s ...' % index_path)
-        with open(index_path, 'rb') as f:
-            while True:
-                try:
-                    key, offset = self.deserialise(f)
-                    self.index[key] = offset
-                except EOFError: break
-
-        self.data_file = open(path + '.data', 'rb')
-        self.data_mmap = mmap.mmap(self.data_file.fileno(), 0, prot=mmap.PROT_READ)
-    
-    @staticmethod
-    def serialise(obj, f):
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-
-    @staticmethod
-    def deserialise(f):
-        return pickle.load(f)
-
-    @staticmethod
-    def static_itervalues(path):
-        with open(path + '.data', 'rb') as f:
-            while True:
-                try:
-                    yield mmdict.deserialise(f)
-                except EOFError: break      
-
-    def iteritems(self):
-        sorted_idx = sorted(self.index.iteritems(), key=operator.itemgetter(1))
-        
-        for i, v in enumerate(self.itervalues()):
-            yield (sorted_idx[i][0], v)
-
-    def iterkeys(self):
-        return self.index.iterkeys()
-
-    def itervalues(self):
-        self.data_mmap.seek(0)
-        while True:
-            try:
-                yield self.deserialise(self.data_mmap)
-            except EOFError: break
-
-    def __len__(self):
-        return len(self.index)
-
-    def __contains__(self, key):
-        return key in self.index
-
-    @lru_cache(maxsize=20000)
-    def __getitem__(self, key):
-        if key not in self:
-            return None
-
-        self.data_mmap.seek(self.index[key])
-        return self.deserialise(self.data_mmap)
-
-    def __enter__(self):
-        return self
-
-    def close(self):
-        if hasattr(self, 'data_mmap') and self.data_mmap != None:
-            self.data_mmap.close()
-        if hasattr(self, 'data_file') and self.data_file != None:
-            self.data_file.close()
-
-    def __exit__(self, type, value, traceback):
-        self.close()
-
-    def __del__(self):
-        self.close()
-
-    @staticmethod
-    def write(path, iter_kvs):
-        with open(path + '.index','wb') as f_index, open(path + '.data', 'wb') as f_data:
-            for key, value in iter_kvs:
-                mmdict.serialise((key,f_data.tell()), f_index)
-                mmdict.serialise(value, f_data)
-
-class EntityMentionContexts(object):
-    "Simple model for entity mentions and context."
-    def __init__(self):
-        self.entity_mentions = dict()
-
-    def add(self, entity, source, left, sf, right):
-        mention = (source, left, sf, right)
-        self.entity_mentions.setdefault(entity, []).append(mention)
-
-    def entity_count(self):
-        return len(self.entity_mentions)
-
-    def iter_entities(self):
-        return self.entity_mentions.iterkeys()
-
-    def mention_count(self):
-        return sum(len(ms) for ms in self.entity_mentions.itervalues())
-
-    def mentions(self, entity):
-        return self.entity_mentions.get(entity, [])
-
-    def iteritems(self):
-        for entity, mentions in self.entity_mentions.iteritems():
-            for mention in mentions:
-                yield (entity, mention)
-
-    def get_entities_by_surface_form(self):
-        entities_by_name = defaultdict(set)
-
-        for entity, mentions in self.entity_mentions.iteritems():
-            for _, _, name, _ in mentions:
-                entities_by_name[name.lower()].add(entity)
-
-        return entities_by_name
-
-    def write(self, path):
-        "Write model to file."
-
-        log.debug(
-            'Writing wikilinks context model (%i entities, %i mentions): %s ...' 
-            % (self.entity_count(), self.mention_count(), path))
-        
-        with open(path, 'wb') as f:
-            #marshal.dump(self.term_occurences, f)
-            for entity, mentions in self.entity_mentions.iteritems():
-                marshal.dump((entity, mentions), f)
-
-    @staticmethod
-    def iter_entity_mentions_from_path(path):
-        with open(path, 'rb') as fh:
-            #marshal.load(fh) # todo: remove after model rebuilt
-            while True:
-                try:
-                    yield marshal.load(fh)
-                except EOFError: break
-
-    @staticmethod
-    def read(path):
-        "Read model from file."
-        emc = EntityMentionContexts()
-
-        log.debug('Loading mention context model: %s ...' % path)
-        with open(path, 'rb') as fh:
-            #marshal.load(fh) # todo: remove after model rebuilt
-            while True:
-                try:
-                    entity, mentions = marshal.load(fh)
-                    emc.entity_mentions[entity] = mentions
-                except EOFError: break
-
-        return emc
