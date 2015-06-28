@@ -309,6 +309,7 @@ class BuildMentionModel(MRCorpusProcessor):
     def __init__(self, docs_path):
         class Token(dr.Ann):
             norm = dr.Field()
+            span = dr.Slice()
         class Link(dr.Ann):
             span = dr.Slice(Token)
             target = dr.Field()
@@ -326,6 +327,18 @@ class BuildMentionModel(MRCorpusProcessor):
     def normalise_target(self, target):
         return self.redirect_model.map(normalise_wikipedia_link(target))
 
+    def toks_to_text(self, tokens):
+        parts = []
+        offset = tokens[0].span.start
+        length = 0
+        for t in tokens:
+            if offset != t.span.start:
+                parts.append(' ' * (t.span.start - offset))
+            parts.append(t.norm)
+            offset = t.span.stop
+            length += len(t.norm)
+        return ''.join(parts)
+
     def mapper(self, doc):
         sentence_offsets = [s.span.start for s in doc.sentences]
         links_by_sentence = defaultdict(list)
@@ -335,12 +348,12 @@ class BuildMentionModel(MRCorpusProcessor):
 
         mentions = []
         for sidx, links in links_by_sentence.iteritems():
-            sentence = [t.norm for t in doc.tokens[doc.sentences[sidx].span]]
+            sentence = [t for t in doc.tokens[doc.sentences[sidx].span]]
             links = [[link.span, self.normalise_target(link.target)] for link in links]
             mentions.append((sentence, links))
 
         for toks, links in mentions:
-            print ' '.join(toks)
+            print self.toks_to_text(toks)
             for span, target in links:
                 print '\t' + target
 
@@ -350,7 +363,7 @@ class BuildMentionModel(MRCorpusProcessor):
 
     def __call__(self):
         log.info("Processing docs: %s ...", self.docs_path)
-        for i, name in enumerate(self.iter_results()):
+        for i, name in enumerate(self.iter_results(processes=1)):
             if i % 10000 == 0:
                 log.info(i)
 
