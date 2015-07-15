@@ -21,7 +21,6 @@ class TrainMentionClassifier(object):
         self.features = feature
         self.mapping = 'PolynomialMapper'
         self.classifier_id = classifier_id
-        self.client = MongoClient()
     
         # todo: parameterise hyperparameters
         self.hparams = {
@@ -32,14 +31,11 @@ class TrainMentionClassifier(object):
 
         self.hparams['dual'] = self.hparams['penalty'] == 'l2' and \
                                self.hparams['loss'] == 'l1'
-    
+
     def __call__(self):
-        log.info('Fetching training docs (%s-%s)...', self.corpus_id or 'all', self.tag_filter or 'all') 
-        docs = self.get_training_docs() 
-        
-        log.info('Computing feature statistics over %i documents...', len(docs))
-        mapper_params = self.compute_mapper_params(docs)
-        mapper = mapping.FEATURE_MAPPERS[self.mapping](**mapper_params)
+        docs = self.get_docs(self.corpus_id, self.tag_filter)
+        mapper_params = self.get_mapper_params(self.features, docs)
+        mapper = self.get_mapper(self.mapping, mapper_params)
 
         log.info('Building training set...')
         X, y = [], []
@@ -68,29 +64,40 @@ class TrainMentionClassifier(object):
 
         log.info('Done.')
 
-    def compute_mapper_params(self, docs): 
+    def iter_instances(self, docs):
+        raise NotImplementedError
+
+    @classmethod
+    def get_docs(cls, corpus, tag):
+        log.info('Fetching training docs (%s-%s)...', corpus or 'all', tag or 'all')
+        store = MongoClient().docs[corpus]
+
+        flt = {}
+        if tag != None:
+            flt['tag'] = tag
+
+        # keeping all docs in memory could be problematic for large datasets
+        # but simplifies computation of mapper parameters. todo: offline mapper prep
+        return [Doc.obj(json) for json in store.find(flt)]
+
+    @classmethod
+    def get_mapper_params(cls, features, docs):
+        log.info('Computing feature statistics over %i documents...', len(docs))
         means, stds = [], []
-        for f in self.features:
+        for f in features:
             raw = [c.features[f] for d in docs for m in d.chains for c in m.candidates]
             means.append(numpy.mean(raw))
             stds.append(numpy.std(raw))
 
         return {
-            'features': self.features,
+            'features': features,
             'means': means,
             'stds': stds
         }
 
-    def get_training_docs(self):
-        store = self.client.docs[self.corpus_id]
-        
-        flt = {}
-        if self.tag_filter != None:
-            flt['tag'] = self.tag_filter
-
-        # keeping all docs in memory could be problematic for large datasets
-        # but simplifies computation of mapper parameters. todo: offline mapper prep
-        return [Doc.obj(json) for json in store.find(flt)]
+    @classmethod
+    def get_mapper(cls, mapper_name, params):
+        return mapping.FEATURE_MAPPERS[mapper_name](**params)
 
     @classmethod
     def add_arguments(cls, p):

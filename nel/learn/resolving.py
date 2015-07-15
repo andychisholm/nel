@@ -1,6 +1,8 @@
 import numpy
 import random
 
+from ..model import model
+from ..features import mapping
 from .train import TrainMentionClassifier
 
 import logging
@@ -13,7 +15,11 @@ class TrainLinearResolver(TrainMentionClassifier):
     def __init__(self, **kwargs):
         self.ranking_feature = kwargs.pop('ranker')
         super(TrainLinearResolver, self).__init__(**kwargs)
+        self.mapping ='ZeroMeanUnitVarianceMapper'
+
         self.hparams['fit_intercept'] = True
+        self.hparams['C'] = 0.1
+        self.hparams['class_weight'] = 'auto'
 
     def iter_instances(self, docs):
         toggle = True
@@ -24,16 +30,16 @@ class TrainLinearResolver(TrainMentionClassifier):
                     # skip mentions without candidates
                     continue
 
-                top_candidate = sorted(chain.candidates, key=lambda c: c.features[self.ranking_feature], reverse=True)[0]
-
-                # todo: adjust class weights
-                if chain.resolution:
-                    # only learn postitive instances where the ranker correctly resolves the mention
-                    # todo: experiment with training NILs regardless of whether the ranker got it right
-                    if top_candidate.id == chain.resolution.id:
-                        yield top_candidate.fv, self.NON_NIL_CLS
-                else:
-                    yield top_candidate.fv, self.NIL_CLS
+                for _ in chain.mentions:
+                    if chain.resolution:
+                        for c in chain.candidates:
+                            if c.id == chain.resolution.id:
+                                yield c.fv, self.NON_NIL_CLS
+                                break
+                    else:
+                        for c in sorted(chain.candidates, key=lambda c: c.features[self.ranking_feature], reverse=True)[:5]:
+                            yield c.fv, self.NIL_CLS
+                    break
 
     @classmethod
     def add_arguments(cls, p):
