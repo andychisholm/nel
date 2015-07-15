@@ -21,6 +21,7 @@ APPS = [
     extract.ExtractFeature,
     ranking.TrainLinearRanker,
     resolving.TrainLinearResolver,
+    resolving.FitNilThreshold,
     harness.BatchLink,
     harness.ServiceHarness,
 
