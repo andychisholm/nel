@@ -9,7 +9,7 @@ from functools32 import lru_cache
 from collections import Counter
 
 from .feature import Feature
-from ..model.model import mmdict, WordVectors
+from ..model.model import WordVectors
 from ..model import model
 
 import logging
