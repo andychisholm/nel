@@ -8,7 +8,7 @@ class Doc(object):
         self.chains = chains or []
 
     def __str__(self):
-        return self.__unicode__()
+        return '[Doc(%s)]' % self.id
 
     def json(self):
         jd = {
