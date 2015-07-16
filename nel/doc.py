@@ -63,6 +63,10 @@ class Mention(object):
             'text': self.text
         }
 
+    @property
+    def span(self):
+        return slice(self.begin, self.end)
+
     @staticmethod
     def obj(json):
         return Mention(
