@@ -1,4 +1,4 @@
-import logging
+import six
 import Queue
 import socket
 import multiprocessing
@@ -8,7 +8,21 @@ from collections import defaultdict
 from bisect import bisect_left, bisect_right
 from contextlib import contextmanager
 
+import logging
 log = logging.getLogger()
+
+def get_from_module(cid, mod_params, mod_name, instantiate=False, kwargs=None):
+    if isinstance(cid, six.string_types):
+        res = mod_params.get(cid)
+        if not res:
+            raise Exception('Invalid ' + str(mod_name) + ': ' + str(cid))
+        if instantiate and not kwargs:
+            return res()
+        elif instantiate and kwargs:
+            return res(**kwargs)
+        else:
+            return res
+    return cid
 
 def group(iteration, key_getter, value_getter):
     d = defaultdict(list)

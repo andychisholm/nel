@@ -77,6 +77,9 @@ class Mention(object):
     def end(self):
         return self.begin + len(self.text)
 
+    def __len__(self):
+        return len(self.text)
+
 class Candidate(object):
     def __init__(self, entity_id, features=None, fv=None):
         self.id = entity_id

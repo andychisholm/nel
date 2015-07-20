@@ -23,6 +23,7 @@ APPS = [
     resolving.TrainLinearResolver,
     resolving.FitNilThreshold,
     harness.BatchLink,
+    harness.BatchCluster,
     harness.ServiceHarness,
 
     export.ExportEntityInfo,
