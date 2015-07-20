@@ -19,10 +19,11 @@ ENC = 'utf8'
 @PrepareCorpus.Register
 class TacPrepare(object):
     """ Prepare a set of docrep TAC query documents """
-    def __init__(self, mentions_path, links_path, docs_path, redirect_model_tag, gold_mentions):
+    def __init__(self, mentions_path, links_path, docs_path, candidate_model_tag, redirect_model_tag, gold_mentions):
         self.mentions_path = mentions_path
         self.links_path = links_path
         self.docs_path = docs_path
+        self.candidate_model_tag = candidate_model_tag
         self.redirect_model_tag = redirect_model_tag
         self.gold_mentions = gold_mentions
         if self.gold_mentions:
@@ -38,7 +39,7 @@ class TacPrepare(object):
         for m in mentions_by_id.itervalues():
             mentions_by_doc[m['doc']].append(m)
 
-        generate_candidates = CandidateGenerator()
+        generate_candidates = CandidateGenerator(self.candidate_model_tag)
 
         if not self.gold_mentions:
             # todo: parameterise tagger/candidate gen config
@@ -138,9 +139,9 @@ class TacPrepare(object):
         p.add_argument('mentions_path', metavar='QUERY_XML_PATH')
         p.add_argument('links_path', metavar='LINKS_TSV_PATH')
         p.add_argument('docs_path', metavar='SOURCE_DOCS_PATH')
+        p.add_argument('--candidate_model_tag', metavar='CANDIDATE_MODEL', required=False, default='wikipedia')
         p.add_argument('--redirect_model_tag', default='tac', required=False, metavar='REDIRECT_MODEL')
-        p.add_argument('--gold_mentions', action='store_true')
-        #p.add_argument('--gold_mentions', default=False, required=False, type=bool, metavar='USE_GOLD_MENTIONS')
+        p.add_argument('--gold-mentions', action='store_true')
         p.set_defaults(gold_mentions=False)
         p.set_defaults(parsecls=cls)
         return p
