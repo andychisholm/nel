@@ -1,6 +1,6 @@
 # Offline Linking
 
-## Basic
+## Basic Disambiguation
 ```bash
 CONLL_DATA_PATH=conll.txt
 GOLD_OUTPUT=conll_dev.gold.tsv
@@ -122,7 +122,7 @@ doc = linker(doc)
 print inject_html_links(raw, doc)
 ```
 
-### Output
+__Output__
 ```
 <html>
   <body>

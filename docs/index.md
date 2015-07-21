@@ -6,7 +6,7 @@ Out of the box, __nel__ provides:
 
 - support for efficient extraction and storage of entity information from sources like Wikipedia and Wikidata
 - wrappers for state-of-the-art named entity recognition systems (Stanford, Schwa)
-- a full entity linking pipeline supporting coreference, candidate generation, supervised ranking, nil classification and clustering
+- full entity linking pipeline with coreference, candidate generation, supervised ranking, nil classification and clustering
 - support for injestion and easy evaluation of linking systems over benchmark datasets (CoNLL, TAC)
 
 ## License
@@ -23,8 +23,7 @@ __nel__ can be used in a variety of ways:
     - for offline, batch document linking
     - hosting an entity linking server
     - processing of evaluation corpora and training documents
-    - building linking models over large datasets
-
+    - constructing linking models over large datasets
 - from python
     - for online document linking
     - model inspection and corpus analysis

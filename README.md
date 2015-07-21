@@ -1,9 +1,7 @@
 nel
 ======================
 
-Python based Named Entity Linking tool.
-
-Implementation based on work described in *Entity Disambiguation with Web Links* ([pdf](http://aclweb.org/anthology/Q15-1011)).
+__nel__ is an fast, accurate and highly modular framework for linking entities in documents.
 
 ### Linking Example
 
@@ -72,7 +70,11 @@ print inject_html_links(raw, doc)
 
 ### Getting Started
 
-Documentation is a **work in progress**, see the [install guide](docs/guide.md) to get started.
+Documentation is available online via: [nel.readthedocs.org](http://nel.readthedocs.org/en/latest/).
+
+### Citation
+
+__nel__ is based on work described in *Entity Disambiguation with Web Links* ([pdf](http://aclweb.org/anthology/Q15-1011)).
 
 ----------------
 NEL is open-source software released under an MIT licence.
