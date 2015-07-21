@@ -1,8 +1,6 @@
-# Examples
+# Offline Linking
 
-## Offline Linking
-
-### Basic
+## Basic
 ```bash
 CONLL_DATA_PATH=conll.txt
 GOLD_OUTPUT=conll_dev.gold.tsv
@@ -26,7 +24,7 @@ nel batch-link --corpus conll --tag dev --fmt neleval --ranker EntityProbability
 neleval evaluate -m strong_link_match -f tab -g $GOLD_OUTPUT $SYSTEM_OUTPUT
 ```
 
-### Supervised Feature Combination
+## Supervised Feature Combination
 ```bash
 # extract an EntityProbability feature using the 'wikipedia' derived model
 nel extract-feature --corpus conll EntityProbability wikipedia
@@ -49,7 +47,7 @@ nel extract-feature --corpus conll ClassifierScore combined_pm
 nel batch-link --corpus conll --tag dev --fmt neleval --ranker ClassifierScore[combined_pm] > $SYSTEM_OUTPUT
 ```
 
-### Re-ranking with Coherence
+## Re-ranking with Coherence
 ```bash
 # given an initial ranking, we can extract coherence features based on entity co-mention counts in wikipedia
 nel extract-feature --corpus conll MeanConditionalProbability ClassifierScore[combined_pm] wikipedia
@@ -71,7 +69,7 @@ nel extract-feature --corpus conll ClassifierScore reranker
 nel batch-link --corpus conll --tag dev --fmt neleval --ranker ClassifierScore[reranker] > $SYSTEM_OUTPUT
 ```
 
-## Running a linking pipeline from Python
+# Running from Python
 
 ```python
 from nel.doc import Doc

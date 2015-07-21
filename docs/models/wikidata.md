@@ -1,12 +1,10 @@
-# Wikidata
-
-### Download
+# Download
 ```
 WKDATA_DUMP_FN=20150420.json.gz
 wget http://dumps.wikimedia.org/other/wikidata/$WKDATA_DUMP_FN
 ```
 
-### Model Building
+# Building Entity Set Models
 ```
 nel build-wikidata-entity-set \
   $WKDATA_DUMP_FN \

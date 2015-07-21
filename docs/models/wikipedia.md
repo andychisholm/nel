@@ -1,6 +1,4 @@
-# Wikipedia Model Building
-
-## Preparation
+# Preparation
 ```
 WK_DUMP_DATE=latest
 WK_DUMP_FN=enwiki-$WK_DUMP_DATE-pages-articles.xml.bz2
@@ -8,23 +6,23 @@ WK_PLAIN_PATH=$WK_DUMP_FN\_extracted
 WK_DOCREP_PATH=wikipedia.$WK_DUMP_DATE.dr
 WK_SPLIT_PATH=wikipedia.$WK_DUMP_DATE.split
 ```
-## Download
+# Download
 ```
 wget http://dumps.wikimedia.org/enwiki/latest/$WK_DUMP_FN
 ```
 
-## Strip Wikimedia Markup
+# Strip Wiki Markup
 ```
 # tested with v2.6 of: https://github.com/bwbaugh/wikipedia-extractor
 bzcat $WK_DUMP_FN|python WikiExtractor.py -cb 500k -l -s -o $WK_PLAIN_PATH
 ```
 
-## Extract Redirects
+# Extract Redirects
 ```
 nel build-wikipedia-redirects $WK_DUMP_FN
 ```
 
-## Convert to Docrep
+# Convert to Docrep
 ```
 nel build-wikipedia-docrep $WK_PLAIN_PATH $WK_DOCREP_PATH
 
@@ -32,7 +30,7 @@ rm $WK_DUMP_FN
 rm -r $WK_PLAIN_PATH
 ```
 
-### Model Building
+## Model Building
 ```
 dr split --in-file $WK_DOCREP_PATH -t $WK_SPLIT_PATH/wikipedia.{n:03d}.dr k 1000
 
@@ -43,7 +41,7 @@ nel build-link-models $WK_SPLIT_PATH wikipedia
 nel build-context-models $WK_SPLIT_PATH wikipedia
 ```
 
-### Export
+## Export
 ```
 nel export-entity-info wikipedia wikipedia entities.tsv --threshold 5
 ```

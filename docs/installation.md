@@ -1,6 +1,4 @@
-# Installation
-
-## Prerequisites
+# Prerequisites
 
 ```
 # system packages
@@ -23,7 +21,7 @@ unzip stanford-ner-2014-08-27.zip -d ner
 rm stanford-ner-2014-08-27.zip
 ```
 
-### libschwa
+## libschwa
 
 See: https://github.com/schwa-lab/libschwa/wiki/Installing
 
@@ -35,7 +33,7 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 ```
 
-## Installing nel
+# Install the Linker
 
 ```
 virtualenv ve
@@ -44,7 +42,7 @@ virtualenv ve
 pip install git+http://git@github.com/wikilinks/nel.git
 ```
 
-## Setup a local data store
+## Setup the Data Store
 
 To store linking models and work with offline corpora, nel requires access to some kind of data store.
 
@@ -57,7 +55,7 @@ By default, mongodb is prefered:
 export NEL_DATASTORE_URI='mongodb://localhost'
 ```
 
-## Optional: Install evaluation tools
+# Install the Eval Tools
 
 ```
 pip install git+http://github.com/wikilinks/neleval.git#egg=neleval
