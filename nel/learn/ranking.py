@@ -31,7 +31,10 @@ class TrainLinearRanker(TrainMentionClassifier):
 
         # todo: parameterise instance selection parameters
         self.sample_instances = sample_by_magnitude
-        self.mention_instance_limit = 10
+        self.instance_limit = 10
+
+    def iter_instances(self, docs):
+        return self.iter_pairwise_instances_with_sampling(docs, self.sample_instances, self.instance_limit)
 
     @staticmethod
     def iter_pairwise_instances_with_sampling(docs, sampler, limit):
@@ -88,4 +91,3 @@ class TrainLinearRanker(TrainMentionClassifier):
 
                 if negatives:
                     yield positive, negatives
-
