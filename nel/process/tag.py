@@ -4,11 +4,14 @@ import os
 from itertools import izip
 from time import time
 from bisect import bisect_left
+from schwa import dr
+from subprocess import Popen, PIPE
+from threading import Thread
 
 from .process import Process
 from ..model import model
 from ..doc import Mention, Chain, Candidate
-from ..util import group, spanset_insert, tcp_socket
+from ..util import group, spanset_insert, tcp_socket, byte_to_char_map, StreamingQueue
 
 import logging
 log = logging.getLogger()
@@ -68,14 +71,14 @@ class Tagger(Process):
         """Yield mention annotations."""
         raise NotImplementedError
 
-    def _mention_over_tokens(self, doc, i, j):
+    def _mention_over_tokens(self, doc, i, j, tag=None):
         """Create mention annotation from token i to token j-1."""
         toks = doc.tokens[i:j]
         begin = toks[0].begin
         end = toks[-1].end
         text = doc.text[begin:end]
 
-        return Mention(begin, text)
+        return Mention(begin, text, tag)
 
 class CandidateGenerator(Process):
     def __init__(self, candidate_model_tag):
@@ -175,6 +178,83 @@ class StanfordTagger(Tagger):
                 yield self._mention_over_tokens(doc, start, i)
 
         log.debug('Tagged doc (%s) with %i tokens in %.2fs', doc.id, len(doc.tokens), time() - start_time)
+
+class SchwaTagger(Tagger):
+    """ Tags named entities using the schwa docrep ner system (Dawborn, 15) """
+    FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money']
+    def __init__(self, ner_package_path, ner_model):
+        self.ner_package_path = ner_package_path
+        self.ner_model = ner_model
+
+        # docrep schema used by the tokeniser and tagger
+        class Token(dr.Ann):
+            raw = dr.Text()
+            norm = dr.Text()
+            pos = dr.Field()
+            lemma = dr.Field()
+            span = dr.Slice()
+            tidx = dr.Field()
+        class NamedEntity(dr.Ann):
+            span = dr.Slice(Token)
+            label = dr.Field()
+        class Doc(dr.Doc):
+            doc_id = dr.Field()
+            tokens = dr.Store(Token)
+            named_entities = dr.Store(NamedEntity)
+        self.schema = Doc.schema()
+
+        # once the tokeniser handles multi-doc streaming we can pipe directly to tagger
+        self.tagger_process = Popen([
+            './schwa-ner-tagger',
+            '--crf1-only', 'true',
+            '--model', self.ner_model
+        ],  cwd = self.ner_package_path, stdout = PIPE, stdin = PIPE)
+
+        # setup a thread to listen for output from the tagger process
+        # we need this to facilitate async reads from stdout
+        self.out_queue = StreamingQueue()
+        self.enqueue_thread = Thread(target=self.enqueue_stream, args=(self.tagger_process.stdout, self.out_queue))
+        self.enqueue_thread.daemon = True
+        self.enqueue_thread.start()
+
+        # output stream reader
+        self.out_queue_reader = dr.Reader(self.out_queue, self.schema)
+
+    @staticmethod
+    def enqueue_stream(out, queue):
+        while True:
+            queue.put(out.read(1))
+        out.close()
+
+    def text_to_dr(self, text):
+        tokenizer = Popen([
+            './schwa-tokenizer',
+            '-p', 'docrep'
+        ], cwd = self.ner_package_path, stdout = PIPE, stdin = PIPE)
+
+        tok_dr, _ = tokenizer.communicate(text)
+        self.tagger_process.stdin.write(tok_dr)
+        self.tagger_process.stdin.flush()
+        try:
+            return self.out_queue_reader.read()
+        except:
+            self.out_queue.queue.clear()
+            self.out_queue_reader = dr.Reader(self.out_queue, self.schema)
+            raise
+
+    def _tag(self, doc):
+        encoding = 'utf-8'
+        raw = doc.text.replace(u'\u2018',"'").replace(u'\u2019',"'").encode(encoding)
+
+        # tagger returns byte offsets for tokens, we need unicode character offsets
+        offset_map = byte_to_char_map(raw)
+        tagged_dr = self.text_to_dr(raw)
+        doc.tokens = [Mention(offset_map[t.span.start]-1, t.raw) for t in tagged_dr.tokens]
+
+        for e in tagged_dr.named_entities:
+            tag = e.label.lower()
+            if tag not in self.FLT_TAGS:
+                yield self._mention_over_tokens(doc, e.span.start, e.span.stop, tag)
 
 MAX_MENTION_LEN = 4
 class LookupTagger(Tagger):

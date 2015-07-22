@@ -3,6 +3,7 @@ import Queue
 import socket
 import multiprocessing
 
+from time import time
 from itertools import chain
 from collections import defaultdict
 from bisect import bisect_left, bisect_right
@@ -23,6 +24,16 @@ def get_from_module(cid, mod_params, mod_name, instantiate=False, kwargs=None):
         else:
             return res
     return cid
+
+def byte_to_char_map(byte_str, encoding='utf-8'):
+    mapping = {}
+    char_str = byte_str.decode(encoding)
+    byte_offset = 0
+    for char_offset, c in enumerate(char_str):
+        mapping[byte_offset] = char_offset
+        byte_offset += len(c.encode(encoding))
+
+    return mapping
 
 def group(iteration, key_getter, value_getter):
     d = defaultdict(list)
@@ -52,6 +63,20 @@ def spanset_insert(indicies, begin, end):
         indicies.insert(b_idx + 1, end)
 
     return can_insert
+
+class StreamingQueue(Queue.Queue):
+    TIMEOUT=0.001
+    def read(self, n):
+        buf = self.get() if n > 0 else ''
+        t = time()
+        while len(buf) < n and (time() - t < self.TIMEOUT):
+            if self.empty():
+                continue
+            before = len(buf)
+            buf += self.get_nowait()
+            if before != len(buf):
+                t = time()
+        return buf
 
 def spawn_worker(f):
     def fun(wid, q_in, q_out, recycle_interval):
