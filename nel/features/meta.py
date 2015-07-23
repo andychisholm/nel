@@ -22,42 +22,24 @@ log = logging.getLogger()
 @Feature.Extractable
 class ClassifierScore(Feature):
     """ Computes a feature score based on the output of a classifier over a set of features. """
-    def __init__(self, classifier, provider=None):
-        provider = provider or 'mongo'
-        
-        log.info('Loading classifier (%s) via (%s)...', classifier, provider)
-        
-        if provider == 'mongo':
-            store = MongoClient().models.classifiers
-            model = store.find_one({'_id':classifier})
-            if not model:
-                raise ValueError('Found no classifier with id (%s) in store.' % classifier)
-        elif provider == 'file':
-            with open(classifier, 'r') as f:
-                model = json.load(f)
-        else:
-            raise NotImplementedError
-
-        self._id = model['_id']
-        self.weights = np.array(model['weights']).T
-        self.intercept = model['intercept']
-        self.mapper = FEATURE_MAPPERS[model['mapping']['name']](**model['mapping']['params'])
+    def __init__(self, classifier):
+        log.info('Loading classifier (%s)...', classifier)
+        self.classifier_model = model.LinearClassifier(classifier)
+        self._id = classifier
 
     @property
     def id(self):
         return 'ClassifierScore[%s]' % self._id
 
     def compute_doc_state(self, doc):
-        doc = self.mapper(doc) 
+        doc = self.classifier_model.mapper(doc) 
 
     def compute(self, doc, chain, candidate, state):
-        """ Returns a feature value """
-        return np.dot(candidate.fv, self.weights) + self.intercept
+        return self.classifier_model.score(candidate)
 
     @classmethod
     def add_arguments(cls, p):
         p.add_argument('classifier', metavar='CLASSIFIER')
-        p.add_argument('--provider', metavar='PROVIDER', choices=['mongo','file'], default='mongo', required=False)
         p.set_defaults(featurecls=cls)
         return p
 
