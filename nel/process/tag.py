@@ -182,9 +182,11 @@ class StanfordTagger(Tagger):
 class SchwaTagger(Tagger):
     """ Tags named entities using the schwa docrep ner system (Dawborn, 15) """
     FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money']
-    def __init__(self, ner_package_path, ner_model):
+    def __init__(self, ner_package_path, tagger_path='schwa-ner-tagger', tokenizer_path='schwa-tokenizer', ner_model_name='conll12'):
+        self.tagger_path = tagger_path
+        self.tokenizer_path = tokenizer_path
         self.ner_package_path = ner_package_path
-        self.ner_model = ner_model
+        self.ner_model_name = ner_model_name
 
         # docrep schema used by the tokeniser and tagger
         class Token(dr.Ann):
@@ -203,11 +205,11 @@ class SchwaTagger(Tagger):
             named_entities = dr.Store(NamedEntity)
         self.schema = Doc.schema()
 
-        # once the tokeniser handles multi-doc streaming we can pipe directly to tagger
+        # configure the schwa ner tagger
         self.tagger_process = Popen([
-            './schwa-ner-tagger',
+            self.tagger_path,
             '--crf1-only', 'true',
-            '--model', self.ner_model
+            '--model', os.path.join(self.ner_package_path, self.ner_model_name)
         ],  cwd = self.ner_package_path, stdout = PIPE, stdin = PIPE)
 
         # setup a thread to listen for output from the tagger process
@@ -228,7 +230,7 @@ class SchwaTagger(Tagger):
 
     def text_to_dr(self, text):
         tokenizer = Popen([
-            './schwa-tokenizer',
+            self.tokenizer_path,
             '-p', 'docrep'
         ], cwd = self.ner_package_path, stdout = PIPE, stdin = PIPE)
 
