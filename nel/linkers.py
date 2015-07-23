@@ -5,7 +5,7 @@ import math
 
 from time import time
 from .process.resolve import GreedyOverlapResolver
-from .process.tag import StanfordTagger, CandidateGenerator
+from .process.tag import SchwaTagger, StanfordTagger, CandidateGenerator
 from .process.tokenise import RegexTokeniser, TOKEN_RE
 from .process.resolve import FeatureRankResolver
 from .process.process import Pipeline
@@ -28,13 +28,18 @@ class OnlineLinker(Pipeline):
             raise Exception("Invalid feature class: (%s)" % ', '.join(invalid_features))
 
         feature_extractors = [feature_clss[f['name']](**f['params']) for f in self.config['features']]
-
         resolution = RankingResolver(**self.config['resolver'])
 
+        # todo: move to dynamic instantiation of all pipeline components
+        tagger_pipelines = {
+            'schwa': lambda: [ SchwaTagger(**self.config['tagger']['params']) ],
+            'stanford': lambda: [ RegexTokeniser(TOKEN_RE), StanfordTagger(**self.config['tagger']['params']) ]
+        }
+        if self.config['tagger']['name'] not in tagger_pipelines:
+            raise Exception("Unsupported tagger (%s), select from: %s" % (self.config['tagger']['name'], ', '.join(tagger_pipelines.iterkeys())))
+
         log.info('Building pipeline...')
-        self.processors = [
-            RegexTokeniser(TOKEN_RE), 
-            StanfordTagger(**self.config['tagger']['params']),
+        self.processors = tagger_pipelines[self.config['tagger']['name']]() + [
             CandidateGenerator(**self.config['candidate_generation']['params']),
         ] + feature_extractors \
           + resolution.processors

@@ -1,6 +1,6 @@
 {
     "tagger": {
-        "name": "StanfordTagger",
+        "name": "stanford",
         "params": {
             "host": "127.0.0.1",
             "port": 1447
@@ -41,8 +41,7 @@
         }, {
             "name": "ClassifierScore",
             "params": {
-                "classifier_id": "reranker",
-                "provider": "mongo"
+                "classifier_id": "reranker"
             }
         }
     ],
