@@ -181,7 +181,7 @@ class StanfordTagger(Tagger):
 
 class SchwaTagger(Tagger):
     """ Tags named entities using the schwa docrep ner system (Dawborn, 15) """
-    FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money']
+    FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money','quantity']
     def __init__(self, ner_package_path, tagger_path='schwa-ner-tagger', tokenizer_path='schwa-tokenizer', ner_model_name='conll12'):
         self.tagger_path = tagger_path
         self.tokenizer_path = tokenizer_path
