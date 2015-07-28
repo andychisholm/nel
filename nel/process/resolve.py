@@ -6,16 +6,17 @@ import logging
 log = logging.getLogger()
 
 class FeatureRankResolver(Process):
-    def __init__(self, ranking_feature, resolving_feature = None):
+    def __init__(self, ranking_feature, resolving_feature = None, resolving_threshold = 0.5):
         self.ranking_feature = ranking_feature
         self.resolving_feature = resolving_feature
+        self.resolving_threshold = resolving_threshold
 
     def __call__(self, doc):
         for m in doc.chains:
             m.resolution = None
             if m.candidates:
                 top_candidate = sorted(m.candidates, key=lambda c: c.features[self.ranking_feature], reverse=True)[0]
-                if not self.resolving_feature or top_candidate.features[self.resolving_feature] > 0:
+                if not self.resolving_feature or top_candidate.features[self.resolving_feature] > self.resolving_threshold:
                     m.resolution = top_candidate
         return doc
 
