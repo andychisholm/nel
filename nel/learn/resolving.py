@@ -1,6 +1,7 @@
 import numpy
 import random
 from scipy.optimize import minimize_scalar
+from sklearn.svm import SVC
 
 from ..model import model
 from ..features import mapping
@@ -76,12 +77,17 @@ class TrainLinearResolver(TrainMentionClassifier):
     NON_NIL_CLS = '1'
     def __init__(self, **kwargs):
         self.ranking_feature = kwargs.pop('ranker')
+        kwargs['mapping'] = 'ZeroMeanUnitVarianceMapper'
         super(TrainLinearResolver, self).__init__(**kwargs)
-        self.mapping ='ZeroMeanUnitVarianceMapper'
 
-        self.hparams['fit_intercept'] = True
-        self.hparams['C'] = 0.1
-        self.hparams['class_weight'] = 'auto'
+    def init_model(self):
+        hparams = {
+            'kernel': 'rbf',
+            'C': 1000.,
+            'probability': True
+        }
+
+        return SVC(**hparams)
 
     def iter_instances(self, docs):
         toggle = True
@@ -99,7 +105,7 @@ class TrainLinearResolver(TrainMentionClassifier):
                                 yield c.fv, self.NON_NIL_CLS
                                 break
                     else:
-                        for c in sorted(chain.candidates, key=lambda c: c.features[self.ranking_feature], reverse=True)[:5]:
+                        for c in sorted(chain.candidates, key=lambda c: c.features[self.ranking_feature], reverse=True)[:30]:
                             yield c.fv, self.NIL_CLS
                     break
 

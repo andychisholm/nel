@@ -19,29 +19,47 @@ from ..model.model import EntityOccurrence
 import logging
 log = logging.getLogger()
 
-@Feature.Extractable
-class ClassifierScore(Feature):
+class ClassifierFeature(Feature):
     """ Computes a feature score based on the output of a classifier over a set of features. """
     def __init__(self, classifier):
         log.info('Loading classifier (%s)...', classifier)
-        self.classifier_model = model.LinearClassifier(classifier)
         self._id = classifier
-
-    @property
-    def id(self):
-        return 'ClassifierScore[%s]' % self._id
+        self.classifier = model.Classifier(classifier)
 
     def compute_doc_state(self, doc):
-        doc = self.classifier_model.mapper(doc) 
+        doc = self.classifier.mapper(doc) 
+
+    def predict(self, fv):
+        raise NotImplementedError # returns numerical prediction given a vector of features
 
     def compute(self, doc, chain, candidate, state):
-        return self.classifier_model.score(candidate)
+        return self.predict(candidate.fv)
 
     @classmethod
     def add_arguments(cls, p):
         p.add_argument('classifier', metavar='CLASSIFIER')
         p.set_defaults(featurecls=cls)
         return p
+
+@Feature.Extractable
+class ClassifierScore(ClassifierFeature):
+    """ Computes a feature score based on the output of the classifier decision function over a set of features. """
+    @property
+    def id(self):
+        return 'ClassifierScore[%s]' % self._id
+
+    def predict(self, fv):
+        return float(self.classifier.model.decision_function(fv))
+
+@Feature.Extractable
+class ClassifierProbability(ClassifierFeature):
+    """ Computes a feature score based on the output probability of a classifier over a set of features. """
+    @property
+    def id(self):
+        return 'ClassifierProbability[%s]' % self._id
+
+    def predict(self, fv):
+        return self.classifier.model.predict_proba(fv)[0][1]
 
 class CoherenceBase(Feature):
     def __init__(self, ranker):

@@ -5,6 +5,7 @@ from functools32 import lru_cache
 
 import itertools
 import numpy as np
+import cPickle as pickle
 import math
 import logging
 from time import time
@@ -336,28 +337,29 @@ class TermDocumentFrequency(object):
             'created_at': get_timestamp()
         })
 
-class LinearClassifier(object):
+class Classifier(object):
     mid = 'models:classifiers'
     def __init__(self, name):
         self.name = name
-        model = ObjectStore.Get(self.mid).fetch(name)
-        if model:
-            self.weights = np.array(model['weights'])
-            self.intercept = model['intercept']
-            self.mapper = FEATURE_MAPPERS[model['mapping']['name']](**model['mapping']['params'])
-        else:
-            raise SystemException('No classifier for name (%s) in store', self.name)
 
-    def score(self, candidate):
-        return np.dot(candidate.fv, self.weights) + self.intercept
+        dm = ObjectStore.Get(self.mid).fetch(name)
+        if dm:
+            # undo the data store encoding here - it's really binary data
+            self.model = pickle.loads(dm['data'].encode('utf-8'))
+            self.mapper = FEATURE_MAPPERS[dm['mapping']['name']](**dm['mapping']['params'])
+        else:
+            raise Exception('No classifier for name (%s) in store', self.name)
 
     @classmethod
-    def create(cls, name, model):
-        log.info('Storing linear classifier model (%s)...', name)
-        model = dict(model)
-        model['_id'] = name
-        model['created_at'] = get_timestamp()
-        ObjectStore.Get(cls.mid).save(model)
+    def create(cls, name, mapping, data, metadata = {}):
+        log.info('Storing classifier model (%s)...', name)
+        ObjectStore.Get(cls.mid).save({
+            '_id': name,
+            'created_at': get_timestamp(),
+            'mapping': mapping,
+            'data': data,
+            'metadata': metadata
+        })
 
 class EntityCooccurrence(CountModel):
     def __init__(self, tag, uri = None):

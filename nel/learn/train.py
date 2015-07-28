@@ -1,5 +1,5 @@
 import numpy
-from sklearn.svm import LinearSVC
+import cPickle as pickle
 from pymongo import MongoClient
 
 from ..doc import Doc
@@ -11,7 +11,7 @@ log = logging.getLogger()
 
 class TrainMentionClassifier(object):
     """ Abstract class for training an SVM classifier over mentions in a corpus of documents. """
-    def __init__(self, corpus, tag, feature, classifier_id):
+    def __init__(self, corpus, tag, feature, classifier_id, mapping):
         if corpus == None:
             # todo: multi corpus training
             raise NotImplementedError    
@@ -19,49 +19,39 @@ class TrainMentionClassifier(object):
         self.corpus_id = corpus
         self.tag_filter = tag
         self.features = feature
-        self.mapping = 'PolynomialMapper'
+        self.mapping = mapping
         self.classifier_id = classifier_id
-    
-        # todo: parameterise hyperparameters
-        self.hparams = {
-            'C': 0.0316228,
-            'penalty': 'l2',
-            'loss': 'l1'
-        }
 
-        self.hparams['dual'] = self.hparams['penalty'] == 'l2' and \
-                               self.hparams['loss'] == 'l1'
+    def init_model(self):
+        raise NotImplementedError
 
     def __call__(self):
         docs = self.get_docs(self.corpus_id, self.tag_filter)
         mapper_params = self.get_mapper_params(self.features, docs)
         mapper = self.get_mapper(self.mapping, mapper_params)
 
-        log.info('Building training set...')
+        log.info('Building training set, feature mapping = %s...', self.mapping)
         X, y = [], []
         for x, cls in self.iter_instances(mapper(doc) for doc in docs):
             X.append(x)
             y.append(cls)
 
         log.info('Fitting model over %i instances...', len(y))
-        svc = LinearSVC(**self.hparams)
-        svc.fit(X, y)
+        classifier = self.init_model()
+        classifier.fit(X, y)
 
-        correct = sum(1.0 for i, _y in enumerate(svc.predict(X)) if y[i] == _y)
+        correct = sum(1.0 for i, _y in enumerate(classifier.predict(X)) if y[i] == _y)
         log.info('Training set pairwise classification: %.1f%% (%i/%i)', correct*100/len(y), int(correct), len(y))
 
-        # todo: refactor to avoid dependency on internal classifier representation here
-        model.LinearClassifier.create(self.classifier_id, {
-            'weights': list(svc.coef_[0]),
-            'intercept': svc.intercept_[0],
-            'mapping': {
-                'name': mapper.__class__.__name__,
-                'params': mapper_params
-            },
+        mapping = {
+            'name': mapper.__class__.__name__,
+            'params': mapper_params
+        }
+        metadata = {
             'corpus': self.corpus_id,
             'tag': self.tag_filter
-        })
-
+        }
+        model.Classifier.create(self.classifier_id, mapping, pickle.dumps(classifier), metadata)
         log.info('Done.')
 
     def iter_instances(self, docs):

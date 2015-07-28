@@ -1,6 +1,6 @@
 import numpy
 import random
-
+from sklearn.svm import LinearSVC
 from .train import TrainMentionClassifier
 
 import logging
@@ -26,8 +26,8 @@ def sample_by_std(_, negatives, limit):
 class TrainLinearRanker(TrainMentionClassifier):
     """ Trains a linear candidate ranker over a corpus of documents. """
     def __init__(self, **kwargs):
+        kwargs['mapping'] = 'PolynomialMapper'
         super(TrainLinearRanker, self).__init__(**kwargs)
-        self.mapping = 'PolynomialMapper'
 
         # todo: parameterise instance selection parameters
         self.sample_instances = sample_by_magnitude
@@ -35,6 +35,19 @@ class TrainLinearRanker(TrainMentionClassifier):
 
     def iter_instances(self, docs):
         return self.iter_pairwise_instances_with_sampling(docs, self.sample_instances, self.instance_limit)
+
+    def init_model(self):
+        # todo: parameterise hyperparams
+        hparams = {
+            'C': 0.0316228,
+            'penalty': 'l2',
+            'loss': 'l1',
+            'class_weight': 'auto',
+            'fit_intercept': True
+        }
+
+        hparams['dual'] = hparams['penalty'] == 'l2' and hparams['loss'] == 'l1'
+        return LinearSVC(**hparams)
 
     @staticmethod
     def iter_pairwise_instances_with_sampling(docs, sampler, limit):
