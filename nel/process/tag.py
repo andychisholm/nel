@@ -179,6 +179,24 @@ class StanfordTagger(Tagger):
 
         log.debug('Tagged doc (%s) with %i tokens in %.2fs', doc.id, len(doc.tokens), time() - start_time)
 
+# docrep schema used by the tokeniser and tagger
+class Token(dr.Ann):
+    raw = dr.Text()
+    norm = dr.Text()
+    pos = dr.Field()
+    lemma = dr.Field()
+    span = dr.Slice()
+    tidx = dr.Field()
+
+class NamedEntity(dr.Ann):
+    span = dr.Slice(Token)
+    label = dr.Field()
+
+class SchwaDoc(dr.Doc):
+    doc_id = dr.Field()
+    tokens = dr.Store(Token)
+    named_entities = dr.Store(NamedEntity)
+
 class SchwaTagger(Tagger):
     """ Tags named entities using the schwa docrep ner system (Dawborn, 15) """
     FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money','quantity']
@@ -187,23 +205,7 @@ class SchwaTagger(Tagger):
         self.tokenizer_path = tokenizer_path
         self.ner_package_path = ner_package_path
         self.ner_model_name = ner_model_name
-
-        # docrep schema used by the tokeniser and tagger
-        class Token(dr.Ann):
-            raw = dr.Text()
-            norm = dr.Text()
-            pos = dr.Field()
-            lemma = dr.Field()
-            span = dr.Slice()
-            tidx = dr.Field()
-        class NamedEntity(dr.Ann):
-            span = dr.Slice(Token)
-            label = dr.Field()
-        class Doc(dr.Doc):
-            doc_id = dr.Field()
-            tokens = dr.Store(Token)
-            named_entities = dr.Store(NamedEntity)
-        self.schema = Doc.schema()
+        self.schema = SchwaDoc.schema()
 
         # configure the schwa ner tagger
         self.tagger_process = Popen([
