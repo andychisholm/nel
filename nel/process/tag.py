@@ -206,6 +206,13 @@ class SchwaTagger(Tagger):
         self.ner_package_path = ner_package_path
         self.ner_model_name = ner_model_name
         self.schema = SchwaDoc.schema()
+        self.tagger_process = None
+        self.initialise_tagger()
+
+    def initialise_tagger(self):
+        if self.tagger_process != None and self.tagger_process.poll() == None:
+            # this should indirectly terminate the thread listing on stdout also
+            self.tagger_process.kill()
 
         # configure the schwa ner tagger
         self.tagger_process = Popen([
@@ -217,7 +224,7 @@ class SchwaTagger(Tagger):
         # setup a thread to listen for output from the tagger process
         # we need this to facilitate async reads from stdout
         self.out_queue = StreamingQueue()
-        self.enqueue_thread = Thread(target=self.enqueue_stream, args=(self.tagger_process.stdout, self.out_queue))
+        self.enqueue_thread = Thread(target=self.enqueue_process_output, args=(self.tagger_process, self.out_queue))
         self.enqueue_thread.daemon = True
         self.enqueue_thread.start()
 
@@ -225,10 +232,9 @@ class SchwaTagger(Tagger):
         self.out_queue_reader = dr.Reader(self.out_queue, self.schema)
 
     @staticmethod
-    def enqueue_stream(out, queue):
-        while True:
-            queue.put(out.read(1))
-        out.close()
+    def enqueue_process_output(process, queue):
+        while process.poll() == None:
+            queue.put(process.stdout.read(1))
 
     def text_to_dr(self, text):
         tokenizer = Popen([
@@ -240,10 +246,13 @@ class SchwaTagger(Tagger):
         self.tagger_process.stdin.write(tok_dr)
         self.tagger_process.stdin.flush()
         try:
-            return self.out_queue_reader.read()
+            result = self.out_queue_reader.read()
+            if self.tagger_process.poll() != None:
+                # if the tagger process goes down here, something's gone wrong and the result is probably None
+                raise Exception("Tagger failed while processing document")
+            return result
         except:
-            self.out_queue.queue.clear()
-            self.out_queue_reader = dr.Reader(self.out_queue, self.schema)
+            self.initialise_tagger()
             raise
 
     def _tag(self, doc):
