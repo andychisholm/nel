@@ -43,7 +43,10 @@ def markdown_to_whitespace(markdown_txt):
     for match_t in match_table:
         markdown_txt = markdown_txt.replace(match_t, u' ' * len(match_t))
         
-    for line in markdown_txt.split('\n'):
+    for i, line in enumerate(markdown_txt.split('\n')):
+        if i != 0:
+            resu += u'\n'
+
         if len(line) > 0:
             # remove blockquote formatting
             if line.startswith(u'> '):
@@ -78,7 +81,7 @@ def markdown_to_whitespace(markdown_txt):
                 line = line.replace(u"\\" + char, " " + char)
             
             # add the text if it contains more than a link
-            resu += line + u'\n'
+            resu += line
 
     # remove special unicode characters
     return normalize_special_characters(resu)
