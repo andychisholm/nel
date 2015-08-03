@@ -256,17 +256,8 @@ class SchwaTagger(Tagger):
             self.initialise_tagger()
             raise
 
-    def normalise_text(self, text):
-        # here we map funny unicode character into their ascii equivalents so as not to offend the tagger
-        text = text.replace(u'\xa2','c')
-        text = text.replace(u'\u2014','-')
-        text = text.replace(u'\u2018',"'").replace(u'\u2019',"'")
-        text = text.replace(u'\u201c','"').replace(u'\u201d','"')
-        return text
-
     def _tag(self, doc):
-        encoding = 'utf-8'
-        raw = self.normalise_text(doc.text).encode(encoding)
+        raw = doc.text.encode('utf-8')
 
         # tagger returns byte offsets for tokens, we need unicode character offsets
         offset_map = byte_to_char_map(raw)
