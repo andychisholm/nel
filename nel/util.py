@@ -28,11 +28,11 @@ def get_from_module(cid, mod_params, mod_name, instantiate=False, kwargs=None):
 def byte_to_char_map(byte_str, encoding='utf-8'):
     mapping = {}
     char_str = byte_str.decode(encoding)
-    byte_offset = 0
+    byte_offset, char_offset = 0, 0
     for char_offset, c in enumerate(char_str):
         mapping[byte_offset] = char_offset
         byte_offset += len(c.encode(encoding))
-
+    mapping[byte_offset] = char_offset
     return mapping
 
 def group(iteration, key_getter, value_getter):
