@@ -200,11 +200,12 @@ class SchwaDoc(dr.Doc):
 class SchwaTagger(Tagger):
     """ Tags named entities using the schwa docrep ner system (Dawborn, 15) """
     FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money','quantity']
-    def __init__(self, ner_package_path, tagger_path='schwa-ner-tagger', tokenizer_path='schwa-tokenizer', ner_model_name='conll12'):
+    def __init__(self, ner_package_path, tagger_path='schwa-ner-tagger', tokenizer_path='schwa-tokenizer', ner_model_name='conll12', dequeue_timeout=0.001):
         self.tagger_path = tagger_path
         self.tokenizer_path = tokenizer_path
         self.ner_package_path = ner_package_path
         self.ner_model_name = ner_model_name
+        self.dequeue_timeout = dequeue_timeout
         self.schema = SchwaDoc.schema()
         self.tagger_process = None
         self.initialise_tagger()
@@ -223,7 +224,7 @@ class SchwaTagger(Tagger):
 
         # setup a thread to listen for output from the tagger process
         # we need this to facilitate async reads from stdout
-        self.out_queue = StreamingQueue()
+        self.out_queue = StreamingQueue(timeout=self.dequeue_timeout)
         self.enqueue_thread = Thread(target=self.enqueue_process_output, args=(self.tagger_process, self.out_queue))
         self.enqueue_thread.daemon = True
         self.enqueue_thread.start()
