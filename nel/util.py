@@ -64,27 +64,6 @@ def spanset_insert(indicies, begin, end):
 
     return can_insert
 
-class StreamingQueue(Queue.Queue):
-    def __init__(self, *args, **kwargs):
-        if kwargs and 'timeout' in kwargs:
-            self.timeout = kwargs.pop('timeout')
-        else:
-            self.timeout = 0.001
-
-        Queue.Queue.__init__(self, *args, **kwargs)
-
-    def read(self, n):
-        buf = self.get() if n > 0 else ''
-        t = time()
-        while len(buf) < n and (time() - t < self.timeout):
-            if self.empty():
-                continue
-            before = len(buf)
-            buf += self.get_nowait()
-            if before != len(buf):
-                t = time()
-        return buf
-
 def spawn_worker(f):
     def fun(wid, q_in, q_out, recycle_interval):
         job_count = 0

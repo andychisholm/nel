@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 import os
+import sys
 
 from itertools import izip
 from time import time
 from bisect import bisect_left
 from schwa import dr
 from subprocess import Popen, PIPE
-from threading import Thread
+from cStringIO import StringIO
 
 from .process import Process
 from ..model import model
 from ..doc import Mention, Chain, Candidate
-from ..util import group, spanset_insert, tcp_socket, byte_to_char_map, StreamingQueue
+from ..util import group, spanset_insert, tcp_socket, byte_to_char_map
 
 import logging
 log = logging.getLogger()
@@ -200,19 +201,18 @@ class SchwaDoc(dr.Doc):
 class SchwaTagger(Tagger):
     """ Tags named entities using the schwa docrep ner system (Dawborn, 15) """
     FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money','quantity']
-    def __init__(self, ner_package_path, tagger_path='schwa-ner-tagger', tokenizer_path='schwa-tokenizer', ner_model_name='conll12', dequeue_timeout=0.001):
+    STARTUP_TIMEOUT = 30
+    def __init__(self, ner_package_path, tagger_path='schwa-ner-tagger', tokenizer_path='schwa-tokenizer', ner_model_name='conll12'):
         self.tagger_path = tagger_path
         self.tokenizer_path = tokenizer_path
         self.ner_package_path = ner_package_path
         self.ner_model_name = ner_model_name
-        self.dequeue_timeout = dequeue_timeout
         self.schema = SchwaDoc.schema()
         self.tagger_process = None
         self.initialise_tagger()
 
     def initialise_tagger(self):
         if self.tagger_process != None and self.tagger_process.poll() == None:
-            # this should indirectly terminate the thread listing on stdout also
             self.tagger_process.kill()
 
         # configure the schwa ner tagger
@@ -220,22 +220,13 @@ class SchwaTagger(Tagger):
             self.tagger_path,
             '--crf1-only', 'true',
             '--model', os.path.join(self.ner_package_path, self.ner_model_name)
-        ],  cwd = self.ner_package_path, stdout = PIPE, stdin = PIPE)
+        ],  cwd = self.ner_package_path, stdout = PIPE, stdin = PIPE, stderr = PIPE)
 
-        # setup a thread to listen for output from the tagger process
-        # we need this to facilitate async reads from stdout
-        self.out_queue = StreamingQueue(timeout=self.dequeue_timeout)
-        self.enqueue_thread = Thread(target=self.enqueue_process_output, args=(self.tagger_process, self.out_queue))
-        self.enqueue_thread.daemon = True
-        self.enqueue_thread.start()
-
-        # output stream reader
-        self.out_queue_reader = dr.Reader(self.out_queue, self.schema)
-
-    @staticmethod
-    def enqueue_process_output(process, queue):
-        while process.poll() == None:
-            queue.put(process.stdout.read(1))
+        t = time()
+        while self.tagger_process.stderr.readline().strip() != 'Tagger Ready':
+            if time() - t > self.STARTUP_TIMEOUT:
+                raise Exception("Tagger startup timeout")
+        log.info('Schwa tagger startup completed in %.1fs', time() - t)
 
     def text_to_dr(self, text):
         tokenizer = Popen([
@@ -243,18 +234,25 @@ class SchwaTagger(Tagger):
             '-p', 'docrep'
         ], cwd = self.ner_package_path, stdout = PIPE, stdin = PIPE)
 
-        tok_dr, _ = tokenizer.communicate(text)
+        tok_dr, err = tokenizer.communicate(text)
+        if not tok_dr or err:
+            raise Exception("Schwa tokenizer failed while processing document")
+
         self.tagger_process.stdin.write(tok_dr)
         self.tagger_process.stdin.flush()
+
         try:
-            result = self.out_queue_reader.read()
+            result_sz = int(self.tagger_process.stderr.readline().strip())
+            result_bytes = self.tagger_process.stdout.read(result_sz)
+            result = dr.Reader(StringIO(result_bytes), self.schema).read()
+
             if self.tagger_process.poll() != None:
                 # if the tagger process goes down here, something's gone wrong and the result is probably None
-                raise Exception("Tagger failed while processing document")
+                raise Exception("Schwa tagger failed while processing document")
             return result
-        except:
+        except Exception as e:
             self.initialise_tagger()
-            raise
+            raise Exception("Failed to deserialise schwa tagger output", e), None, sys.exc_info()[2]
 
     def _tag(self, doc):
         raw = doc.text.encode('utf-8')
