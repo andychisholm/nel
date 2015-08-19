@@ -158,12 +158,12 @@ class BuildWikidataEntitySet(object):
                         log.info('Processed %i entities...', entity_count)
 
         log.info('Building entity set over %i possible entities...', entity_count)
-        included_entities = set()
+        included_entities = defaultdict(set)
         for node in self.included_nodes:
             node_count = 0
             for eid in self.iter_children(relation_graph, node):
                 if eid in entities:
-                    included_entities.add(eid)
+                    included_entities[eid].add(node)
                     node_count += 1
             log.debug("Total = %i entities after including %i derived from Q%i", len(included_entities), node_count, node)
 
@@ -171,7 +171,7 @@ class BuildWikidataEntitySet(object):
             node_count = 0
             for eid in self.iter_children(relation_graph, node):
                 if eid in included_entities:
-                    included_entities.remove(eid)
+                    del included_entities[eid]
                     node_count += 1
             log.debug("Total = %i entities after excluding %i derived from Q%i", len(included_entities), node_count, node)
 
@@ -184,10 +184,10 @@ class BuildWikidataEntitySet(object):
                 if label:
                     e[3].append(label.split()[-1])
 
-        # there seem to be a few minors errors with wikidata sitelinks where multiple wikidata
+        # there seem to be a few minor errors with wikidata sitelinks where multiple wikidata
         # items map to the same wikipedia entity, e.g. 671315 and 19371531 both map to 'Helmeringhausen'
         # no nice way to resolve these, so just remap the dict on wikipedia id to blow away the dupes
-        entities = {e[0]:e for k,e in entities.iteritems() if k in included_entities}
+        entities = {e[0]:e+(included_entities[k],) for k,e in entities.iteritems() if k in included_entities}
         if len(entities) != len(included_entities):
             log.warn("Filtered %i entities mapping to more than one wikidata item...", len(included_entities) - len(entities))
 
