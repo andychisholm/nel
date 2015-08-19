@@ -242,17 +242,25 @@ class SchwaTagger(Tagger):
         self.tagger_process.stdin.flush()
 
         try:
-            result_sz = int(self.tagger_process.stderr.readline().strip())
-            result_bytes = self.tagger_process.stdout.read(result_sz)
-            result = dr.Reader(StringIO(result_bytes), self.schema).read()
-
-            if self.tagger_process.poll() != None:
-                # if the tagger process goes down here, something's gone wrong and the result is probably None
+            status = self.tagger_process.stderr.readline().strip()
+            if self.tagger_process.poll() != None or status == '' or status == '0':
                 raise Exception("Schwa tagger failed while processing document")
-            return result
-        except Exception as e:
+
+            try:
+                result_sz = int(status)
+            except ValueError:
+                schwa_error = Exception(status)
+                raise Exception("Schwa tagger error while processing document", schwa_error)
+
+            try:
+                result_bytes = self.tagger_process.stdout.read(result_sz)
+                result = dr.Reader(StringIO(result_bytes), self.schema).read()
+                return result
+            except Exception as e:
+                raise Exception("Failed to deserialise schwa tagger output", e), None, sys.exc_info()[2]
+        except:
             self.initialise_tagger()
-            raise Exception("Failed to deserialise schwa tagger output", e), None, sys.exc_info()[2]
+            raise
 
     def _tag(self, doc):
         raw = doc.text.encode('utf-8')
