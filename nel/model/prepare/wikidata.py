@@ -132,7 +132,12 @@ class BuildWikidataEntitySet(object):
             self.included_nodes = [self.ENTITY_ITEM_ID]
 
         entities = {}
-        relation_graph = defaultdict(list)
+
+        hierarchies = set([
+            self.SUBCLASS_OF_PID,
+            self.INSTANCE_OF_PID,
+        ])
+        hierarchy = {pid:defaultdict(list) for pid in hierarchies}
 
         entity_count = 0
         relation_count = 0
@@ -142,8 +147,8 @@ class BuildWikidataEntitySet(object):
 
                 # extract relations
                 for sub, pid, obj in iter_relations_for_item(item):
-                    if pid == self.INSTANCE_OF_PID or pid == self.SUBCLASS_OF_PID:
-                        relation_graph[obj].append(sub)
+                    if pid in hierarchies:
+                        hierarchy[pid][obj].append(sub)
 
                     relation_count += 1
                     if relation_count % 5000000 == 0:
@@ -161,7 +166,7 @@ class BuildWikidataEntitySet(object):
         included_entities = defaultdict(set)
         for node in self.included_nodes:
             node_count = 0
-            for eid in self.iter_children(relation_graph, node):
+            for eid in self.iter_children(hierarchy, node, hierarchies):
                 if eid in entities:
                     included_entities[eid].add(node)
                     node_count += 1
@@ -169,15 +174,18 @@ class BuildWikidataEntitySet(object):
 
         for node in self.excluded_nodes:
             node_count = 0
-            for eid in self.iter_children(relation_graph, node):
-                if eid in included_entities:
-                    del included_entities[eid]
-                    node_count += 1
-            log.debug("Total = %i entities after excluding %i derived from Q%i", len(included_entities), node_count, node)
+            # find all subclasses of the excluded type
+            for cls_node in self.iter_children(hierarchy, node, set([self.SUBCLASS_OF_PID])):
+                # only filter entities which are a direct instance of one of an excluded class hierarchy
+                for eid in self.iter_children(hierarchy, cls_node, set([self.INSTANCE_OF_PID]), depth_limit=1):
+                    if eid in included_entities:
+                        del included_entities[eid]
+                        node_count += 1
+            log.debug("Total = %i entities after excluding %i instances of classes derived from Q%i", len(included_entities), node_count, node)
 
         # alias expansion tricks
         PERSON_WKID=215627
-        for eid in self.iter_children(relation_graph, PERSON_WKID):
+        for eid in self.iter_children(hierarchy, PERSON_WKID, hierarchies):
             if eid in included_entities:
                 e = entities[eid]
                 label = e[1].strip()
@@ -194,20 +202,27 @@ class BuildWikidataEntitySet(object):
         entity_model = Entities(self.model_tag)
         entity_model.create(entities.itervalues())
 
-    def iter_children(self, graph, root, excluded = None):
+    def iter_children(self, graphs, root, hierarchies, excluded = None, depth_limit = None):
         # tracks visited nodes; excludes nodes from traversal if pre-populated
         excluded = set() if excluded == None else excluded
-        pending = list(graph[root])
+
+        pending = []
+        for pid in hierarchies:
+            pending += graphs[pid][root]
+        pending = [(0, node) for node in pending]
         excluded = excluded.union(pending)
 
         # not quite as pretty, but faster than the recursive version
         while pending:
-            node = pending.pop()
+            depth, node = pending.pop()
             excluded.add(node)
 
-            children = graph.get(node, None)
-            if children:
-                pending += [n for n in children if n not in excluded]
+            if depth_limit == None or depth+1 < depth_limit:
+                children = []
+                for pid in hierarchies:
+                    children += graphs[pid].get(node, [])
+                if children:
+                    pending += [(depth+1, n) for n in children if n not in excluded]
             yield node
 
     @classmethod
