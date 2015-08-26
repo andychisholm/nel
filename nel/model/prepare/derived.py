@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 import math
 import re
-import logging
 import marshal
 import os
 import operator
 import unicodedata
+
+import urllib
+import gzip
+import ujson as json
 
 from time import time
 from collections import defaultdict, Counter
@@ -19,6 +22,7 @@ from ..model import Candidates
 from .util import trim_subsection_link, normalise_wikipedia_link
 from ...util import parmapper
 
+import logging
 log = logging.getLogger()
 
 class MRCorpusProcessor(object):
@@ -57,25 +61,68 @@ class MRCorpusProcessor(object):
                     for result in results:
                         yield result
 
-class BuildLinkModels(MRCorpusProcessor):
+class CorpusProcessor(object):
+    def __init__(self, path):
+        self.input_path = path
+
+    def mapper(self, doc):
+        raise NotImplementedError
+
+    def iter_items(self, path):
+        with gzip.open(path, 'r') as f:
+            for line in f:
+                yield json.loads(line)
+
+    def iter_results(self, processes=None):
+        if processes == 1:
+            for item in self.iter_items(self.input_path):
+                yield self.mapper(item)
+        else:
+            with parmapper(self.mapper, nprocs=processes, recycle_interval=None) as pm:
+                for _, result in pm.consume(self.iter_items(self.input_path)):
+                    yield result
+
+class WikiItemPreprocessor(object):
+    def __init__(self, redirect_model_tag):
+        self.link_prefix = 'https://en.wikipedia.org/wiki/'
+        self.redirects = model.Redirects(redirect_model_tag, prefetch=True)
+
+    def __call__(self, item):
+        links = []
+        for link in item['links']:
+            target = link['target']
+            if not target.startswith(self.link_prefix):
+                continue
+
+            target = urllib.unquote(target[len(self.link_prefix):].encode('utf-8')).decode('utf-8')
+
+            # we may want to ignore subsection links when generating name models
+            # sometimes a page has sections which refer to subsidiary entities
+            # links to these may dilute the name posterior for the main entity
+            # for now we just add everything to keep it simple
+            target = trim_subsection_link(target)
+            target = normalise_wikipedia_link(target)
+            target = self.redirects.map(target)
+            target = trim_subsection_link(target)
+            links.append({
+                'target': target,
+                'span': slice(link['start'], link['stop'])
+            })
+
+        item['links'] = links
+        return item
+
+class BuildLinkModels(CorpusProcessor):
     "Build link derived models from a docrep corpus."
     def __init__(self, docs_path, redirect_model_tag, entities_model_tag, model_tag):
-        class Link(dr.Ann):
-            anchor = dr.Field()
-            target = dr.Field()
-        class Doc(dr.Doc):
-            name = dr.Field()
-            links = dr.Store(Link)
-
-        super(BuildLinkModels, self).__init__(docs_path, Doc.schema())
-
+        super(BuildLinkModels, self).__init__(docs_path)
         self.model_tag = model_tag
         self.entities_model_tag = entities_model_tag
-        self.redirects = model.Redirects(redirect_model_tag, prefetch=False) #True)
 
-        entity_model = model.Entities(self.entities_model_tag)
+        self.preprocessor = WikiItemPreprocessor(redirect_model_tag)
 
         log.info('Loading entity set...')
+        entity_model = model.Entities(self.entities_model_tag)
         self.entity_set = set(entity_model.iter_ids())
 
         if self.entity_set:
@@ -84,34 +131,25 @@ class BuildLinkModels(MRCorpusProcessor):
             raise Exception("Entity set (%s) is empty, build will not yield results.", self.entities_model_tag)
 
     def mapper(self, doc):
-        name_entity_pairs = []
+        doc = self.preprocessor(doc)
 
-        for link in doc.links:
-            # we may want to ignore subsection links when generating name models
-            # sometimes a page has sections which refer to subsidiary entities
-            # links to these may dilute the name posterior for the main entity
-            # for now we just add everything to keep it simple
-            target = trim_subsection_link(link.target)
-            target = normalise_wikipedia_link(target)
-            target = self.redirects.map(target)
-            target = trim_subsection_link(target)
+        name_entity_pairs = []
+        for link in doc['links']:
+            target = link['target']
+            anchor = doc['text'][link['span']]
 
             # ignore out-of-kb links in entity and name probability models
             if target in self.entity_set:
-                name_entity_pairs.append((link.anchor.lower(), target))
+                name_entity_pairs.append((anchor.lower(), target))
 
         return name_entity_pairs
 
     def __call__(self):
-        log.info('Building page link derived models from: %s', self.docs_path)
+        log.info('Building page link derived models from: %s', self.input_path)
 
         nep_model = model.NameProbability(self.model_tag)
         log.info("Flushing name model counts...")
         nep_model.store.flush()
-
-        #co_model = EntityCooccurrence(self.model_tag, store_uri='mongodb://localhost')
-        #log.info("Flushing cooccurrence counts...")
-        #co_model.store.flush()
 
         entity_counts = Counter()
         with data.BatchedOperation(nep_model.merge, 1000000) as nep_merger:
@@ -300,75 +338,5 @@ class BuildCandidateModel(object):
         p.add_argument('redirect_model_tag', metavar='REDIRECT_MODEL_TAG')
         p.add_argument('name_model_tag', metavar='NAME_MODEL_TAG')
         p.add_argument('model_tag', metavar='CANDIDATE_MODEL_TAG')
-        p.set_defaults(cls=cls)
-        return p
-
-from bisect import bisect_right
-class BuildMentionModel(MRCorpusProcessor):
-    "Build mention model over a link document corpus"
-    def __init__(self, docs_path):
-        class Token(dr.Ann):
-            norm = dr.Field()
-            span = dr.Slice()
-        class Link(dr.Ann):
-            span = dr.Slice(Token)
-            target = dr.Field()
-        class Sentence(dr.Ann):
-            span = dr.Slice(Token)
-        class Doc(dr.Doc):
-            name = dr.Field()
-            tokens = dr.Store(Token)
-            links = dr.Store(Link)
-            sentences = dr.Store(Sentence)
-
-        super(BuildMentionModel, self).__init__(docs_path, Doc.schema())
-        self.redirect_model = model.Redirects('wikipedia', prefetch=False)
-
-    def normalise_target(self, target):
-        return self.redirect_model.map(normalise_wikipedia_link(target))
-
-    def toks_to_text(self, tokens):
-        parts = []
-        offset = tokens[0].span.start
-        length = 0
-        for t in tokens:
-            if offset != t.span.start:
-                parts.append(' ' * (t.span.start - offset))
-            parts.append(t.norm)
-            offset = t.span.stop
-            length += len(t.norm)
-        return ''.join(parts)
-
-    def mapper(self, doc):
-        sentence_offsets = [s.span.start for s in doc.sentences]
-        links_by_sentence = defaultdict(list)
-        for link in doc.links:
-            sentence_idx = bisect_right(sentence_offsets, link.span.start) - 1
-            links_by_sentence[sentence_idx].append(link)
-
-        mentions = []
-        for sidx, links in links_by_sentence.iteritems():
-            sentence = [t for t in doc.tokens[doc.sentences[sidx].span]]
-            links = [[link.span, self.normalise_target(link.target)] for link in links]
-            mentions.append((sentence, links))
-
-        for toks, links in mentions:
-            print self.toks_to_text(toks)
-            for span, target in links:
-                print '\t' + target
-
-        import code
-        code.interact(local=locals())
-        return mentions
-
-    def __call__(self):
-        log.info("Processing docs: %s ...", self.docs_path)
-        for i, name in enumerate(self.iter_results(processes=1)):
-            if i % 10000 == 0:
-                log.info(i)
-
-    @classmethod
-    def add_arguments(cls, p):
-        p.add_argument('docs_path', metavar='DOCS_PATH')
         p.set_defaults(cls=cls)
         return p
