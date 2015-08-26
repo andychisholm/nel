@@ -136,9 +136,7 @@ class parmapper(object):
         while expected_output_count == None or expected_output_count > output_count:
             if expected_output_count == None and control_pipe.poll():
                 expected_output_count = control_pipe.recv()
-                log.debug(
-                    'Producer exhausted with %i items total, %i remaining...' % 
-                    (expected_output_count, expected_output_count - output_count))
+                #log.debug('Producer exhausted with %i items total, %i remaining...' % (expected_output_count, expected_output_count - output_count))
             try:
                 # couldn't get this working without a busy wait
                 out, recycle_wid = self.q_out.get_nowait()
