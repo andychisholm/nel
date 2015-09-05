@@ -115,7 +115,15 @@ class WikiItemPreprocessor(object):
 class BuildLinkModels(MRCorpusProcessor):
     "Build link derived models from a docrep corpus."
     def __init__(self, docs_path, redirect_model_tag, entities_model_tag, model_tag):
+
+        class Token(dr.Ann):
+            norm = dr.Field()
+        class Doc(dr.Doc):
+            name = dr.Field()
+            tokens = dr.Store(Token)
+
         super(BuildLinkModels, self).__init__(docs_path, Doc.schema())
+
         self.model_tag = model_tag
         self.entities_model_tag = entities_model_tag
 
