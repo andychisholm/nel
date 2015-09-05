@@ -33,7 +33,7 @@ class ExportEntityInfo(object):
         missing_description = 0
         log.info('Exporting entity information...')
         with open(self.out_path, 'w') as f:
-            for i, (eid, label, description) in enumerate(entities_model.iter_entities()):
+            for i, (eid, label, description, _, _) in enumerate(entities_model.iter_entities()):
                 if i % 250000 == 0:
                     log.debug('Processed %i entities...', i)
 
