@@ -90,8 +90,8 @@ class WikiItemPreprocessor(object):
 
     def __call__(self, item):
         links = []
-        for link in item['links']:
-            target = link['target']
+        for link in item.links:
+            target = link.target
             if not target.startswith(self.link_prefix):
                 continue
 
