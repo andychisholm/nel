@@ -112,7 +112,7 @@ class WikiItemPreprocessor(object):
         item['links'] = links
         return item
 
-class BuildLinkModels(CorpusProcessor):
+class BuildLinkModels(MRCorpusProcessor):
     "Build link derived models from a docrep corpus."
     def __init__(self, docs_path, redirect_model_tag, entities_model_tag, model_tag):
         super(BuildLinkModels, self).__init__(docs_path)
