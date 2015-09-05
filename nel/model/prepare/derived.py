@@ -153,7 +153,7 @@ class BuildLinkModels(MRCorpusProcessor):
         return name_entity_pairs
 
     def __call__(self):
-        log.info('Building page link derived models from: %s', self.input_path)
+        # log.info('Building page link derived models from: %s', self.input_path)
 
         nep_model = model.NameProbability(self.model_tag)
         log.info("Flushing name model counts...")
