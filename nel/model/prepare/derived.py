@@ -18,6 +18,7 @@ from .. import data
 from ..model import WordVectors
 from ..model import EntityOccurrence, EntityCooccurrence
 from ..model import Candidates
+from .wikipedia import WikiDoc
 
 from .util import trim_subsection_link, normalise_wikipedia_link
 from ...util import parmapper
@@ -116,13 +117,7 @@ class BuildLinkModels(MRCorpusProcessor):
     "Build link derived models from a docrep corpus."
     def __init__(self, docs_path, redirect_model_tag, entities_model_tag, model_tag):
 
-        class Token(dr.Ann):
-            norm = dr.Field()
-        class Doc(dr.Doc):
-            name = dr.Field()
-            tokens = dr.Store(Token)
-
-        super(BuildLinkModels, self).__init__(docs_path, Doc.schema())
+        super(BuildLinkModels, self).__init__(docs_path, WikiDoc.schema())
 
         self.model_tag = model_tag
         self.entities_model_tag = entities_model_tag
