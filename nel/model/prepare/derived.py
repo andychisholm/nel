@@ -18,7 +18,6 @@ from .. import data
 from ..model import WordVectors
 from ..model import EntityOccurrence, EntityCooccurrence
 from ..model import Candidates
-from .wikipedia import WikiDoc
 
 from .util import trim_subsection_link, normalise_wikipedia_link
 from ...util import parmapper
@@ -90,8 +89,8 @@ class WikiItemPreprocessor(object):
 
     def __call__(self, item):
         links = []
-        for link in item.links:
-            target = link.target
+        for link in item['links']:
+            target = link['target']
             if not target.startswith(self.link_prefix):
                 continue
 
@@ -113,12 +112,10 @@ class WikiItemPreprocessor(object):
         item['links'] = links
         return item
 
-class BuildLinkModels(MRCorpusProcessor):
+class BuildLinkModels(CorpusProcessor):
     "Build link derived models from a docrep corpus."
     def __init__(self, docs_path, redirect_model_tag, entities_model_tag, model_tag):
-
-        super(BuildLinkModels, self).__init__(docs_path, WikiDoc.schema())
-
+        super(BuildLinkModels, self).__init__(docs_path)
         self.model_tag = model_tag
         self.entities_model_tag = entities_model_tag
 
@@ -148,7 +145,7 @@ class BuildLinkModels(MRCorpusProcessor):
         return name_entity_pairs
 
     def __call__(self):
-        # log.info('Building page link derived models from: %s', self.input_path)
+        log.info('Building page link derived models from: %s', self.input_path)
 
         nep_model = model.NameProbability(self.model_tag)
         log.info("Flushing name model counts...")
