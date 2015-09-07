@@ -1,47 +1,23 @@
-# Preparation
+# Overview
+
+__nel__ builds linking models over collections of documents in the [wikijson](https://github.com/wikilinks/wikijson) format.
+
+# Prerequisites
 ```
-WK_DUMP_DATE=latest
-WK_DUMP_FN=enwiki-$WK_DUMP_DATE-pages-articles.xml.bz2
-WK_PLAIN_PATH=$WK_DUMP_FN\_extracted
-WK_DOCREP_PATH=wikipedia.$WK_DUMP_DATE.dr
-WK_SPLIT_PATH=wikipedia.$WK_DUMP_DATE.split
-```
-# Download
-```
-wget http://dumps.wikimedia.org/enwiki/latest/$WK_DUMP_FN
+pip install git+http://git@github.com/wikilinks/wikijson.git
 ```
 
-# Strip Wiki Markup
+# Example
 ```
-# tested with v2.6 of: https://github.com/bwbaugh/wikipedia-extractor
-bzcat $WK_DUMP_FN|python WikiExtractor.py -cb 500k -l -s -o $WK_PLAIN_PATH
-```
+# download the latest wikipedia dump
+wget http://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2 -O wikipedia.xml.bz2
 
-# Extract Redirects
-```
-nel build-wikipedia-redirects $WK_DUMP_FN
-```
+# preprocess the Wikipedia dump with wikijson
+wikijson process-dump wikipedia.xml.bz2 wikipedia.js.gz
 
-# Convert to Docrep
-```
-nel build-wikipedia-docrep $WK_PLAIN_PATH $WK_DOCREP_PATH
+# extract redirects mappings
+nel build-wikipedia-redirects wikipedia.xml.bz2
 
-rm $WK_DUMP_FN
-rm -r $WK_PLAIN_PATH
-```
-
-## Model Building
-```
-dr split --in-file $WK_DOCREP_PATH -t $WK_SPLIT_PATH/wikipedia.{n:03d}.dr k 1000
-
-# EntityPrior, NameProbability and EntityOccurrence models
-nel build-link-models $WK_SPLIT_PATH wikipedia
-
-# Entity textual context models
-nel build-context-models $WK_SPLIT_PATH wikipedia
-```
-
-## Export
-```
-nel export-entity-info wikipedia wikipedia entities.tsv --threshold 5
+# build linking models over inlinks and comentions
+nel build-link-models wikipedia.js.gz wikipedia
 ```

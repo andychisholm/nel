@@ -42,7 +42,7 @@ virtualenv ve
 pip install git+http://git@github.com/wikilinks/nel.git
 ```
 
-## Setup the Data Store
+## Setting up a Data Store
 
 To store linking models and work with offline corpora, nel requires access to some kind of data store.
 
