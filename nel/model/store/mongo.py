@@ -77,7 +77,7 @@ class MongoFieldStore(MongoStore, FieldStore):
                 bulk.find({
                     '_id': oid
                 }).upsert().update_one({
-                    '$inc': {self.to_db_field(f):v for f,v in updates.iteritems()}
+                    '$inc': {self.to_db_field(f):v for f,v in updates}
                 })
 
         bulk.execute()
