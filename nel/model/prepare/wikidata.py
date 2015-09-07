@@ -46,7 +46,7 @@ def iter_relations_for_item(item):
             datatype = statement['mainsnak'].get('datatype', None)
 
             if datatype == 'wikibase-item':
-                tid = statement['mainsnak']['datavalue']['value']['numeric-id']
+                tid = statement['mainsnak'].get('datavalue', {}).get('value', {}).get('numeric-id', 0)
                 yield (int(item['id'][1:]), pid, int(tid))
 
 R_PD_MATCH=')'

@@ -261,7 +261,7 @@ class FragmentTokenizer(object):
     def end_item(self): pass
 
     def begin_heading(self, h): pass
-    def end_heading(self): pass
+    def end_heading(self, h): pass
     def begin_document(self): pass
     def end_document(self): pass
 

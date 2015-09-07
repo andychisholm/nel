@@ -46,7 +46,6 @@ APPS = [
     derived.BuildLinkModels,
     derived.BuildTermDocumentFrequencyModel,
     derived.BuildTermFrequencyModel,
-    derived.BuildMentionModel,
     derived.BuildCandidateModel,
     
     tac.BuildTacRedirects,
