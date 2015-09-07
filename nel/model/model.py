@@ -45,14 +45,14 @@ class Entities(object):
 
         with self.store.batched_inserter(250000) as s:
             entity_count = 0
-            for eid, label, description, aliases, _ in iter_entities:
-                data = {
+            for eid, label, description, aliases, types in iter_entities:
+                s.append({
                     '_id': eid,
                     'label': label,
                     'description': description,
-                    'aliases': aliases
-                }
-                s.append(data)
+                    'aliases': aliases,
+                    'types': types
+                })
 
                 entity_count += 1
                 if entity_count % 250000 == 0:
