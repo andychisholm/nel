@@ -2,7 +2,7 @@
 import math
 from collections import Counter
 
-from .features import feature import Feature
+from .feature import Feature
 from ..model.disambiguation import EntityContext
 
 import logging
