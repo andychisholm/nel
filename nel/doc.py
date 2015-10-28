@@ -52,17 +52,19 @@ class Chain(object):
             Candidate.obj(json['resolution']) if json['resolution'] else None)
 
 class Mention(object):
-    def __init__(self, begin, text, tag=None):
+    def __init__(self, begin, text, tag=None, mid=None):
         self.begin = begin
         self.text = text
         self.tag = tag
+        self.mid = mid
 
     def json(self):
         return {
             'begin': self.begin,
             'end': self.end,
             'text': self.text,
-            'tag': self.tag
+            'tag': self.tag,
+            'mid': self.mid
         }
 
     @property
@@ -74,7 +76,8 @@ class Mention(object):
         return Mention(
             json['begin'],
             json['text'],
-            json.get('tag', None))
+            json.get('tag', None),
+            json.get('mid', None))
 
     @property
     def end(self):
