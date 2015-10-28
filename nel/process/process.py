@@ -92,7 +92,7 @@ class DocMapper(object):
         ]
 
         log.info('Running %s-process doc mapper over %i docs', 'single' if self.processes==1 else 'multi', total_docs)
-        with ProgressBar(total_docs, widgets, redirect_stdout=True) as progress:
+        with ProgressBar(total_docs, widgets, redirect_stdout=self.processes != 1) as progress:
             for i, doc in enumerate(self.iter_processed_docs(corpus)):
                 try:
                     corpus.save(doc.json())
