@@ -76,20 +76,31 @@ class ServiceHarness(object):
 
 class BatchLink(object):
     """ Batch linking harness """
-    def __init__(self, corpus, tag, ranker, resolver, fmt):
+    def __init__(self, corpus, tag, ranker, resolver, clusterer, fmt):
         self.corpus = corpus
         self.tag = tag
         self.out_fh = sys.stdout
         
+        self.link = None
+        self.clusterer = None
+
         if ranker:
             self.link = RankingResolver(ranker, resolver)
-        else:
-            self.link = None
+        if self.clusterer:
+            self.clusterer = cluster.get(clusterer)
 
         self.fmt = {
             'neleval':format.to_neleval
         }[fmt]
-    
+
+    def iter_results(self, query):
+        for json_doc in query:
+            doc = Doc.obj(json_doc)
+            if self.link:
+                doc = self.clean(doc)
+                doc = self.link(doc)
+            yield doc
+
     def __call__(self):
         """Link documents """
         store = MongoClient().docs[self.corpus]
@@ -100,11 +111,11 @@ class BatchLink(object):
         query = store.find(flt)
         log.info('Linking %i %s%s documents...', query.count(), self.corpus, (' '+self.tag) if self.tag else '')
 
-        for json_doc in query:
-            doc = Doc.obj(json_doc)
-            if self.link:
-                doc = self.clean(doc)
-                doc = self.link(doc)
+        result_iter = self.iter_results(query)
+        if self.link and self.clusterer:
+            result_iter = self.clusterer(list(self.iter_results(query)))
+
+        for doc in result_iter:
             out = self.fmt(doc).encode('utf-8')
             if out:
                 print >>self.out_fh, out
@@ -118,55 +129,11 @@ class BatchLink(object):
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('--corpus', metavar='CORPUS')
-        p.add_argument('--tag', metavar='TAG', default=None, required=False)
-        p.add_argument('--fmt', metavar='FORMAT', default='neleval', choices=['neleval'], required=False)
-        p.add_argument('--ranker', metavar='RANKER', default=None, required=False)
-        p.add_argument('--resolver', metavar='RANKER', default=None, required=False)
-        p.set_defaults(cls=cls)
-        return p
-
-class BatchCluster(object):
-    """ Batch clustering harness """
-    def __init__(self, corpus, tag, fmt, clusterer):
-        self.corpus = corpus
-        self.tag = tag
-        self.out_fh = sys.stdout
-        self.clusterer = cluster.get(clusterer)
-
-        self.fmt = {
-            'neleval':format.to_neleval
-        }[fmt]
-
-    def __call__(self):
-        store = MongoClient().docs[self.corpus]
-        flt = {}
-        if self.tag != None:
-            flt['tag'] = self.tag
-
-        query = store.find(flt)
-        log.info('Fetching %i %s%s documents...', query.count(), self.corpus, (' '+self.tag) if self.tag else '')
-        docs = list(Doc.obj(d) for d in query)
-
-        log.info('Clustering documents...')
-        clusters = self.clusterer(docs)
-
-        for i, chains in enumerate(clusters):
-            for c in chains:
-                c.resolution = Candidate('CLUSTER_%i' % i)
-
-        log.info('Writing output...')
-        for d in docs:
-            out = self.fmt(d).encode('utf-8')
-            if out:
-                print >>self.out_fh, out
-        log.info('Done.')
-
-    @classmethod
-    def add_arguments(cls, p):
         p.add_argument('--corpus', metavar='CORPUS', required=True)
         p.add_argument('--tag', metavar='TAG', default=None, required=False)
         p.add_argument('--fmt', metavar='FORMAT', default='neleval', choices=['neleval'], required=False)
-        p.add_argument('--clusterer', metavar='CLUSTERER', required=True)
+        p.add_argument('--ranker', metavar='RANKER', default=None, required=False)
+        p.add_argument('--resolver', metavar='RESOLVER', default=None, required=False)
+        p.add_argument('--clusterer', metavar='CLUSTERER', default=None, required=False, choices=['name'])
         p.set_defaults(cls=cls)
         return p
