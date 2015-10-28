@@ -97,6 +97,20 @@ class CandidateGenerator(Process):
             chain.candidates = [Candidate(c) for c in candidates]
         return doc
 
+class SpacyTagger(Tagger):
+    FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money','quantity']
+    def __init__(self):
+        from spacy.en import English
+        self.nlp = English(parser=False)
+
+    def _tag(self, doc):
+        d = self.nlp(doc.text)
+        doc.tokens = [Mention(t.idx+1, t.text) for t in d]
+        for e in d.ents:
+            tag = e.label_.lower()
+            if tag not in self.FLT_TAGS:
+                yield self._mention_over_tokens(doc, e.start, e.end, e.label_)
+
 class StanfordTagger(Tagger):
     def __init__(self, host, port):
         self.host = host
