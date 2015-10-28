@@ -28,7 +28,7 @@ class Tagger(Process):
         while unchained_mentions:
             mention = unchained_mentions.pop(0)
 
-            potential_antecedents = [(m.text, m) for m in unchained_mentions]
+            potential_antecedents = [(m.text, m) for m in unchained_mentions if m.tag == mention.tag]
             chain = [mention]
 
             likely_acronym = False
@@ -57,7 +57,7 @@ class Tagger(Process):
                 
                 last = longest_mention
                 longest_mention = sorted(chain, key=lambda m: len(m.text), reverse=True)[0]
-                potential_antecedents = [(m.text, m) for m in unchained_mentions]
+                potential_antecedents = [(m.text, m) for m in unchained_mentions if m.tag == mention.tag]
 
             chains.append(Chain(mentions=chain))
             #log.debug('CHAIN(%i): %s' % (len(potential_antecedents), ';'.join(m.text for m in chain)))
@@ -88,11 +88,12 @@ class CandidateGenerator(Process):
     def __call__(self, doc):
         for chain in doc.chains:
             forms = sorted(set(m.text for m in chain.mentions),key=len,reverse=True)
-            candidates = []
+            candidates = set()
             for sf in forms:
-                candidates = self.candidates.search(sf)
-                if candidates:
-                    break
+                candidates = candidates.union(self.candidates.search(sf))
+                #if candidates:
+                #    break
+            #candidates = [c for sf in forms for c in self.candidates.search(sf)]
             chain.candidates = [Candidate(c) for c in candidates]
         return doc
 

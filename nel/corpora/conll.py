@@ -3,7 +3,7 @@ import re
 from collections import defaultdict
 from .prepare import PrepareCorpus
 from ..doc import Doc, Candidate, Chain, Mention
-from ..model import model
+from ..model.corpora import Redirects
 from ..process import tag
 from ..process.tokenise import RegexTokeniser
 
@@ -15,7 +15,7 @@ DOCSTART_MARKER = '-DOCSTART-'
 @PrepareCorpus.Register
 class ConllPrepare(object):
     """ Tokenise and tag a conll document """
-    def __init__(self, conll_data_path, doc_type):
+    def __init__(self, conll_data_path, doc_type, redirect_model_tag, candidate_model_tag):
         self.in_path = conll_data_path
         self.doc_predicate = {
             'all': lambda _: True,
@@ -23,6 +23,8 @@ class ConllPrepare(object):
             'dev': self.is_dev_doc,
             'test': self.is_test_doc
         }[doc_type]
+        self.redirect_model_tag = redirect_model_tag
+        self.candidate_model_tag = candidate_model_tag
 
     @staticmethod
     def is_training_doc(doc_id):
@@ -36,16 +38,15 @@ class ConllPrepare(object):
 
     def __call__(self):
         """ Prepare documents """
-        # todo: parameterise model tags
-        redirects = model.Redirects('wikipedia')
-        candidates = model.Candidates('wikipedia')
+        redirects = Redirects(self.redirect_model_tag)
+        generate_candidates = tag.CandidateGenerator(self.candidate_model_tag)
 
         log.info('Preparing conll documents...')
         for doc, conll_tags in self.iter_docs(self.in_path, self.doc_predicate):
             mentions = []
             for gold_entity, (start, end) in conll_tags:
                 m = Mention(start, doc.text[start:end])
-                m.resolution = redirects.map(gold_entity)
+                m.resolution = redirects.map('en.wikipedia.org/wiki/' + gold_entity)
                 m.surface_form = doc.text[start:end].replace(' ,', ',')
                 mentions.append(m)
 
@@ -62,7 +63,9 @@ class ConllPrepare(object):
                     unique_chains.append(Chain(mentions=ms, resolution=Candidate(r)))
 
             doc.chains = unique_chains
- 
+            doc = generate_candidates(doc)
+
+            """
             for chain in doc.chains:
                 # longest mention string
                 sf = sorted(chain.mentions, key=lambda m: len(m.surface_form), reverse=True)[0].surface_form
@@ -74,6 +77,7 @@ class ConllPrepare(object):
                     chain.candidates = [Candidate(e) for e in cs]
                 else:
                     log.warn('Missing alias (%s): %s' % (doc.id, sf))
+            """
             yield doc
 
     @staticmethod
@@ -134,5 +138,7 @@ class ConllPrepare(object):
     def add_arguments(cls, p):
         p.add_argument('conll_data_path', metavar='CONLL_DATA')
         p.add_argument('doc_type', metavar='DOC_TYPE', choices='all,train,dev,test')
+        p.add_argument('--redirect_model_tag', required=False, default='wikipedia', metavar='REDIRECT_MODEL_TAG')
+        p.add_argument('--candidate_model_tag', required=False, default='wikipedia', metavar='CANDIDATE_MODEL_TAG')
         p.set_defaults(parsecls=cls)
         return p

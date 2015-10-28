@@ -15,6 +15,6 @@ redis==2.10.3
 scikit-learn==0.16.1
 scipy==0.15.1
 six==1.9.0
-thrift==0.9.2
 wsgiref==0.1.2
+Pattern==2.6
 ujson==1.33

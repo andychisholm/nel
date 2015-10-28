@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-__version__ = '0.2.5'
+__version__ = '0.3.0'
 __pkg_name__ = 'nel'
 
 setup(
@@ -42,7 +42,6 @@ setup(
         "scikit-learn",
         "scipy",
         "six",
-        "thrift",
         "wsgiref",
         "ujson"
     ],

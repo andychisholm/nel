@@ -8,10 +8,6 @@ from .corpora import prepare
 from .harness import harness
 from .features import extract
 from .learn import ranking, resolving
-from .model.prepare import wikilinks, wikipedia, wikidata, kopi, \
-                           dbpedia, yago, freebase, \
-                           derived, wordvec, export, \
-                           tac
 
 import logging
 log = logging.getLogger()
@@ -24,45 +20,11 @@ APPS = [
     resolving.FitNilThreshold,
     harness.BatchLink,
     harness.BatchCluster,
-    harness.ServiceHarness,
-
-    export.ExportEntityInfo,
-    export.ExportContextTrainingSet,
-
-    wikilinks.BuildWikilinksLexicalisations,
-    wikilinks.BuildWikilinksEntityContext,
-    wikilinks.BuildWikilinksMentions,
-
-    wikipedia.BuildWikipediaDocrep,
-    wikipedia.BuildWikipediaRedirects,
-    wikipedia.BuildWikiHitCounts,
-    wikipedia.BuildWikipediaDisambiguationDescriptions,
-
-    wikidata.BuildWikidataEntitySet,
-    wikidata.BuildWikidataRedirects,
-
-    kopi.BuildKopiWikiEntityContext,
-    
-    derived.BuildLinkModels,
-    derived.BuildTermDocumentFrequencyModel,
-    derived.BuildTermFrequencyModel,
-    derived.BuildCandidateModel,
-    
-    tac.BuildTacRedirects,
-
-    wordvec.BuildWordVectors,
-    wordvec.BuildEntityEmbeddings,
-    
-    dbpedia.BuildDbpediaLexicalisations,
-    dbpedia.BuildDbpediaLinks,
-    dbpedia.BuildDbpediaRedirects,
-
-    yago.BuildYagoMeansNames, 
-    freebase.BuildFreebaseCandidates,
+    harness.ServiceHarness
 ]
 
 def main(args=sys.argv[1:]):
-    p = argparse.ArgumentParser(description='Named Entity Linker.')
+    p = argparse.ArgumentParser(description='nel entity linking framework')
     sp = p.add_subparsers()
     for cls in APPS:
         name = re.sub('([A-Z])', r'-\1', cls.__name__).lstrip('-').lower()

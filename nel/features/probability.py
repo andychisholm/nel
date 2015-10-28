@@ -1,28 +1,27 @@
 #!/usr/bin/env python
 import math
 from .feature import Feature
-from functools32 import lru_cache
-from ..model import model
+from ..model import disambiguation
 
 import logging
 log = logging.getLogger()
 
-class LogProbabilityFeature(Feature):    
+class LogFeature(Feature):    
     def compute(self, doc, chain, candidate, state):
-        return math.log(self.candidate_probability(doc, chain, candidate, state))
+        return math.log(self.compute_raw(doc, chain, candidate, state))
 
-    def candidate_probability(self, doc, mention, candidate, state):
+    def compute_raw(self, doc, chain, candidate, state):
         raise NotImplementedError
 
 @Feature.Extractable
-class EntityProbability(LogProbabilityFeature):
+class EntityProbability(LogFeature):
     """ Entity prior probability. """
     def __init__(self, entity_prior_model_tag):
         self.tag = entity_prior_model_tag
-        self.epm = model.EntityPrior(self.tag)
+        self.em = disambiguation.EntityCounts(self.tag)
 
-    def candidate_probability(self, doc, mention, candidate, state):
-        return self.epm.prior(candidate.id)
+    def compute_raw(self, doc, chain, candidate, state):
+        return self.em.count(candidate.id) + 0.1
 
     @classmethod
     def add_arguments(cls, p):
@@ -31,31 +30,33 @@ class EntityProbability(LogProbabilityFeature):
         return p
 
 @Feature.Extractable
-class NameProbability(LogProbabilityFeature):
-    """ Entity given Name probability. """
+class NameProbability(LogFeature):
+    """ Conditional probability of an entity given the mentioned name. """
     def __init__(self, name_model_tag):
         self.tag = name_model_tag
-        self.npm = model.NameProbability(self.tag)
+        self.npm = disambiguation.NameProbability(self.tag)
 
     def compute_doc_state(self, doc):
-        sfs_by_chain = {}
-        
+        sfs = set(m.text.lower() for c in doc.chains for m in c.mentions)
+        probs_by_sf = self.npm.get_probs_for_names(sfs)
+
+        probs_by_chain = {}
         for chain in doc.chains:
             names = set(m.text.lower() for m in chain.mentions)
             names = sorted(names, key=len, reverse=True)
             sf = None
             for name in names:
                 # todo: refactor - depending on the store, this can be a fairly wasteful lookup
-                if not self.npm.is_zero(name):
+                if probs_by_sf[name]:
                     sf = name
                     break
             # we take the longest non-zero name, or the longest name if all are zeros
-            sfs_by_chain[chain] = sf or names[0]
-        
-        return sfs_by_chain
-    
-    def candidate_probability(self, doc, chain, candidate, state):
-        return self.npm.probability(state[chain], candidate.id, [c.id for c in chain.candidates])
+            probs_by_chain[chain] = probs_by_sf[sf or names[0]]
+
+        return probs_by_chain
+
+    def compute_raw(self, doc, chain, candidate, state):
+        return state[chain].get(candidate.id, 1e-10)
 
     @classmethod
     def add_arguments(cls, p):

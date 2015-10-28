@@ -67,7 +67,8 @@ class RedisStore(Store):
 
 class RedisObjectStore(RedisStore, ObjectStore):
     def __init__(self, *args, **kwargs):
-        self.fmt = kwargs.pop('fmt', json)
+        self.deserialise = kwargs.pop('deserializer', json.loads)
+        self.serialise = kwargs.pop('serializer', json.dumps)
         super(RedisObjectStore, self).__init__(*args, **kwargs)
 
     def deserialise(self, data):
@@ -78,7 +79,7 @@ class RedisObjectStore(RedisStore, ObjectStore):
 
     def _fetch_batch(self, keys_iter):
         for data in self.kvs.mget(keys_iter):
-            yield self.deserialise(data) 
+            yield self.deserialise(data) if data != None else None 
 
     def fetch(self, oid):
         key = self.to_key(oid)
