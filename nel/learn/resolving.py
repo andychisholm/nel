@@ -105,7 +105,7 @@ class TrainLinearResolver(TrainMentionClassifier):
                                 yield c.fv, self.NON_NIL_CLS
                                 break
                     else:
-                        for c in sorted(chain.candidates, key=lambda c: c.features[self.ranking_feature], reverse=True)[:30]:
+                        for c in sorted(chain.candidates, key=lambda c: c.features[self.ranking_feature], reverse=True)[:10]:
                             yield c.fv, self.NIL_CLS
                     break
 
