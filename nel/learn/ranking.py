@@ -41,12 +41,11 @@ class TrainLinearRanker(TrainMentionClassifier):
         hparams = {
             'C': 0.0316228,
             'penalty': 'l2',
-            'loss': 'l1',
+            'loss': 'hinge',
             'class_weight': 'auto',
             'fit_intercept': True
         }
 
-        hparams['dual'] = hparams['penalty'] == 'l2' and hparams['loss'] == 'l1'
         return LinearSVC(**hparams)
 
     @staticmethod
