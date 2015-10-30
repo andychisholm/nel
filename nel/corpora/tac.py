@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from .prepare import PrepareCorpus
 from ..doc import Doc, Chain, Mention, Candidate
-from ..model.model import Redirects
+from ..model.corpora import Redirects
 from ..process.tag import Tagger, StanfordTagger, CandidateGenerator
 from ..process.tokenise import RegexTokeniser, TOKEN_RE
 from ..harness.format import markup_to_whitespace

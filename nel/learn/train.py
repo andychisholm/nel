@@ -4,7 +4,7 @@ from pymongo import MongoClient
 
 from ..doc import Doc
 from ..features import mapping
-from ..model import model
+from ..model.resolution import Classifier
 
 import logging
 log = logging.getLogger()
@@ -51,7 +51,7 @@ class TrainMentionClassifier(object):
             'corpus': self.corpus_id,
             'tag': self.tag_filter
         }
-        model.Classifier.create(self.classifier_id, mapping, pickle.dumps(classifier), metadata)
+        Classifier.create(self.classifier_id, mapping, pickle.dumps(classifier), metadata)
         log.info('Done.')
 
     def iter_instances(self, docs):

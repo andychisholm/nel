@@ -10,7 +10,7 @@ from subprocess import Popen, PIPE
 from cStringIO import StringIO
 
 from .process import Process
-from ..model import model
+from ..model import recognition
 from ..doc import Mention, Chain, Candidate
 from ..util import group, spanset_insert, tcp_socket, byte_to_char_map
 
@@ -83,7 +83,7 @@ class Tagger(Process):
 
 class CandidateGenerator(Process):
     def __init__(self, candidate_model_tag):
-        self.candidates = model.Candidates(candidate_model_tag)
+        self.candidates = recognition.Candidates(candidate_model_tag)
  
     def __call__(self, doc):
         for chain in doc.chains:

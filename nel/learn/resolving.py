@@ -3,7 +3,7 @@ import random
 from scipy.optimize import minimize_scalar
 from sklearn.svm import SVC
 
-from ..model import model
+from ..model.resolution import Classifier
 from ..features import mapping
 from .train import TrainMentionClassifier
 
@@ -50,7 +50,7 @@ class FitNilThreshold(object):
         log.debug('Threshold @ %.2f yields NIL fscore: %.3f', result.x, -result.fun*2)
 
         log.info('Saving classifier %s...', self.classifier_id)
-        model.LinearClassifier.create(self.classifier_id, {
+        Classifier.create(self.classifier_id, {
             'weights': list([1.]),
             'intercept': -result.x,
             'mapping': {

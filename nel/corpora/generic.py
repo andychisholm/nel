@@ -4,24 +4,28 @@ from collections import defaultdict
 
 from .prepare import PrepareCorpus
 from ..doc import Doc, Chain, Mention, Candidate
-from ..model.model import Entities, Redirects
-from ..process.tag import Tagger, StanfordTagger, CandidateGenerator
+from ..model.corpora import Redirects
+from ..process.tag import Tagger, SchwaTagger, CandidateGenerator
 from ..process.tokenise import RegexTokeniser, TOKEN_RE
 from ..harness.format import markdown_to_whitespace
-from ..model.prepare.util import normalise_wikipedia_link
 
 import logging
 log = logging.getLogger()
 
 ENC = 'utf8'
 
+def normalise_wikipedia_link(s):
+    s = s.replace(' ', '_').strip('_').strip()
+    if s and s[0].islower():
+        s = s[0].upper() + s[1:]
+    return s
+
 @PrepareCorpus.Register
 class MarkdownPrepare(object):
     """ Injest a set of markdown documents with neleval formatted annotations """
-    def __init__(self, docs_path, annotations_path, entity_model_tag, candidate_model_tag, redirect_model_tag, use_gold_mentions):
+    def __init__(self, docs_path, annotations_path, candidate_model_tag, redirect_model_tag, use_gold_mentions):
         self.docs_path = docs_path
         self.annotations_path = annotations_path
-        self.entity_model = Entities(entity_model_tag)
         self.candidate_generator = CandidateGenerator(candidate_model_tag)
         self.redirect_model = Redirects(redirect_model_tag)
         self.use_gold_mentions = use_gold_mentions
@@ -33,11 +37,8 @@ class MarkdownPrepare(object):
 
                 resolution_id = None
                 if len(parts) > 3:
-                    resolution_id = normalise_wikipedia_link(parts[3])
+                    resolution_id = 'en.wikipedia.org/wiki/' + normalise_wikipedia_link(parts[3])
                     resolution_id = self.redirect_model.map(resolution_id)
-                    if self.entity_model.get(resolution_id) == None:
-                        log.debug('Filtering out-of-KB entity: %s', resolution_id)
-                        resolution_id = None
 
                 yield {
                     'doc': parts[0],
@@ -104,7 +105,6 @@ class MarkdownPrepare(object):
     def add_arguments(cls, p):
         p.add_argument('docs_path', metavar='SOURCE_DOCS_PATH')
         p.add_argument('annotations_path', metavar='ANNOTATIONS_TSV_PATH')
-        p.add_argument('entity_model_tag', metavar='ENTITY_MODEL')
         p.add_argument('candidate_model_tag', metavar='CANDIDATE_MODEL')
         p.add_argument('--redirect_model_tag', default='wikipedia', required=False, metavar='REDIRECT_MODEL')
         p.add_argument('--use_gold_mentions', action='store_true')
