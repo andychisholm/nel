@@ -91,25 +91,35 @@ class CandidateGenerator(Process):
             candidates = set()
             for sf in forms:
                 candidates = candidates.union(self.candidates.search(sf))
-                #if candidates:
-                #    break
-            #candidates = [c for sf in forms for c in self.candidates.search(sf)]
             chain.candidates = [Candidate(c) for c in candidates]
         return doc
 
-class SpacyTagger(Tagger):
-    FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money','quantity']
-    def __init__(self):
-        from spacy.en import English
-        self.nlp = English(parser=False)
+class CRFTagger(Tagger):
+    def __init__(self, model_tag):
+        self.tagger = recognition.SequenceClassifier(model_tag)
 
     def _tag(self, doc):
-        d = self.nlp(doc.text)
-        doc.tokens = [Mention(t.idx+1, t.text) for t in d]
-        for e in d.ents:
-            tag = e.label_.lower()
-            if tag not in self.FLT_TAGS:
-                yield self._mention_over_tokens(doc, e.start, e.end, e.label_)
+        offset = 0
+        doc.tokens = []
+        for sentence in self.tagger.mapper.iter_sequences(doc):
+            for t in sentence:
+                i = 0
+                for i, c in enumerate(doc.text[t.idx:t.idx+len(t.text)]):
+                    if c != ' ':
+                        break
+                doc.tokens.append(Mention(t.idx+i, t.text))
+
+            tags = self.tagger.tag(doc, sentence)
+            start = None
+            for i, tag in enumerate(tags):
+                if start != None and tag != 'I':
+                    yield self._mention_over_tokens(doc, start, i + offset, 'UNK')
+                    start = None
+                if tag == 'B':
+                    start = i + offset
+            if start != None:
+                yield self._mention_over_tokens(doc, start, i + offset + 1, 'UNK')
+            offset += len(sentence)
 
 class StanfordTagger(Tagger):
     def __init__(self, host, port):
@@ -289,35 +299,3 @@ class SchwaTagger(Tagger):
             tag = e.label.lower()
             if tag not in self.FLT_TAGS:
                 yield self._mention_over_tokens(doc, e.span.start, e.span.stop, tag)
-
-MAX_MENTION_LEN = 4
-class LookupTagger(Tagger):
-    """ Create mentions over all ngrams in a document which match items in an alias set. """
-    def __init__(self, max_len=MAX_MENTION_LEN):
-        import nltk
-        from ..util import trie
-        self.max_len = max_len
-
-    def _tag(self, doc):
-        """Yield mention annotations."""
-        tagged_spans = []
-        for m in doc.mentions:
-            spanset_insert(tagged_spans, m.begin, m.end)
-            yield m
-
-        tags = [tag for _, tag in nltk.pos_tag([t.text for t in doc.tokens])]
-        num_tokens = len(doc.tokens)
-        i = 0
-        while i < num_tokens:
-            j = i + self.max_len
-            while j > i:
-                if tags[i][0] == 'N':
-                    mention = self._mention_over_tokens(doc, i, j)
-                    candidates = self.candidates.search(mention.text)
-                    if candidates and spanset_insert(tagged_spans, mention.begin, mention.end):
-                        mention.candidates = [Candidate(e) for e in candidates]
-                        yield mention
-                        i = j-1
-                        break
-                j -= 1
-            i += 1

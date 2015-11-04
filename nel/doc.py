@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 class Doc(object):
-    def __init__(self, text, doc_id=None, tag=None, chains=None, _id=None):
+    def __init__(self, text, doc_id=None, tag=None, chains=None, _id=None, raw=None):
         self.text = text
         self.id = doc_id
         self._id = _id
         self.tag = tag
         self.chains = chains or []
+        self.raw = raw
 
     def __str__(self):
         return '[Doc(%s)]' % self.id
@@ -15,6 +16,7 @@ class Doc(object):
             'id': self.id,
             'tag': self.tag,
             'text': self.text,
+            'raw': self.raw,
             'chains': [c.json() for c in self.chains]
         }
         if self._id != None:
@@ -28,7 +30,8 @@ class Doc(object):
             doc_id=json['id'],
             tag=json['tag'],
             chains=[Chain.obj(c) for c in json['chains']],
-            _id=json.get('_id',None))
+            _id=json.get('_id',None),
+            raw=json.get('raw',None))
 
 class Chain(object):
     """ Chain of coreferential mentions. """

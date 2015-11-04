@@ -5,7 +5,7 @@ from collections import defaultdict
 from .prepare import PrepareCorpus
 from ..doc import Doc, Chain, Mention, Candidate
 from ..model.corpora import Redirects
-from ..process.tag import Tagger, SchwaTagger, CandidateGenerator
+from ..process.tag import Tagger, SchwaTagger, CRFTagger, CandidateGenerator
 from ..process.tokenise import RegexTokeniser, TOKEN_RE
 from ..harness.format import markdown_to_whitespace
 
@@ -13,12 +13,15 @@ import logging
 log = logging.getLogger()
 
 ENC = 'utf8'
-
 def normalise_wikipedia_link(s):
     s = s.replace(' ', '_').strip('_').strip()
     if s and s[0].islower():
         s = s[0].upper() + s[1:]
-    return s
+    return trim_link_subsection(s)
+
+def trim_link_subsection(s):
+    idx = s.find('#')
+    return s if idx == -1 else s[:idx]
 
 @PrepareCorpus.Register
 class MarkdownPrepare(object):
@@ -36,7 +39,7 @@ class MarkdownPrepare(object):
                 parts = line.decode(ENC).strip().split('\t')
 
                 resolution_id = None
-                if len(parts) > 3:
+                if len(parts) > 3 and parts[3].strip():
                     resolution_id = 'en.wikipedia.org/wiki/' + normalise_wikipedia_link(parts[3])
                     resolution_id = self.redirect_model.map(resolution_id)
 
@@ -48,17 +51,25 @@ class MarkdownPrepare(object):
                     }
                 }
 
-    def iter_docs(self):
+    def iter_docs(self, docids):
         for fn in os.listdir(self.docs_path):
             if fn.startswith('.'):
                 continue
             path = os.path.join(self.docs_path, fn)
+            docid = fn.split('.')[0]
+            if docid not in docids:
+                continue
             with open(path, 'r') as f:
                 content = f.read().decode(ENC)
                 converted = markdown_to_whitespace(content)
+                if len(content) != len(converted): # or docid == '04cc61da-0cbb-44f1-94c9-5d3daff887b2':
+                    log.error('Markdown to whitespace offset mismatch.')
+                    import code
+                    code.interact(local=locals())
                 yield {
-                    'id': fn.split('.')[0],
-                    'text': converted
+                    'id': docid,
+                    'text': converted,
+                    'raw': content
                 }
 
     def __call__(self):
@@ -68,12 +79,12 @@ class MarkdownPrepare(object):
             mentions_by_doc[m['doc']].append(m)
 
         if not self.use_gold_mentions:
-            tokeniser = RegexTokeniser(TOKEN_RE)
-            tagger = StanfordTagger(host='127.0.0.1', port=1447)
+            tagger = CRFTagger('ner')
 
-        for d in self.iter_docs():
+        for d in self.iter_docs(set(mentions_by_doc.iterkeys())):
             log.info("Preparing doc: %s ...", d['id'])
-            doc = Doc(doc_id=d['id'],text=d['text'])
+            doc = Doc(doc_id=d['id'], text=d['text'], raw=d['raw'])
+
             mentions = []
             for m in mentions_by_doc[d['id']]:
                 mention = Mention(m['span'].start, d['text'][m['span']])
@@ -92,12 +103,12 @@ class MarkdownPrepare(object):
                         unique_chains.append(Chain(mentions=ms, resolution=rc))
                 doc.chains = unique_chains
             else:
-                doc = tagger(tokeniser(doc))
+                doc = tagger(doc)
 
             doc = self.candidate_generator(doc)
 
-            # todo: may need custom logic here depending on the corpus
-            doc.tag = 'dev'
+            # todo: need custom logic here depending on the corpus
+            doc.tag = 'dev' if doc.id[-1] in '0123' else 'train'
 
             yield doc
 

@@ -7,7 +7,7 @@ import textwrap
 from .corpora import prepare
 from .harness import harness
 from .features import extract
-from .learn import ranking, resolving
+from .learn import ranking, resolving, recognition
 
 import logging
 log = logging.getLogger()
@@ -15,6 +15,7 @@ log = logging.getLogger()
 APPS = [
     prepare.PrepareCorpus,
     extract.ExtractFeature,
+    recognition.TrainSequenceClassifier,
     ranking.TrainLinearRanker,
     resolving.TrainLinearResolver,
     resolving.FitNilThreshold,

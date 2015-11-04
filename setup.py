@@ -36,6 +36,7 @@ setup(
         "libschwa-python",
         "msgpack-python",
         "numpy",
+        "python-crfsuite",
         "pymongo",
         "python-dateutil",
         "redis",
