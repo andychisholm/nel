@@ -25,6 +25,9 @@ class PrepareCorpus(object):
         chain_mention_counts = []
         chain_candidate_counts = []
 
+        entities = set()
+        candidates = set()
+
         log.info('Loading documents for corpus %s...', self.corpus_id)
         for i, doc in enumerate(self.parse()):
             if i % 100 == 0:
@@ -34,7 +37,10 @@ class PrepareCorpus(object):
             for chain in doc.chains:
                 chain_mention_counts.append(len(chain.mentions))
                 chain_candidate_counts.append(len(chain.candidates))
+                for c in chain.candidates:
+                    candidates.add(c.id)
                 if chain.resolution != None:
+                    entities.add(chain.resolution.id)
                     total_non_nil += len(chain.mentions)
                     if chain.resolution.id in [c.id for c in chain.candidates]:
                         total_candidate_recalled += len(chain.mentions)
@@ -57,6 +63,9 @@ class PrepareCorpus(object):
         log.info('Total chains             = %i', total_chains)
         log.info('Mentions per Chain (σ)   = %.1f (%.2f)', numpy.mean(chain_mention_counts), numpy.std(chain_mention_counts))
 
+        log.info(section_delimiter)
+        log.info('Total entities           = %i', len(entities))
+        log.info('Total candidates         = %i', len(candidates))
         log.info(section_delimiter)
         log.info('Candidates per Chain (σ) = %.1f (%.2f)', numpy.mean(chain_candidate_counts), numpy.std(chain_candidate_counts))
 
