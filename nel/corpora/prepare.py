@@ -3,6 +3,7 @@ import argparse
 import textwrap
 import numpy
 
+from collections import defaultdict
 from pymongo import MongoClient
 
 import logging
@@ -28,8 +29,13 @@ class PrepareCorpus(object):
         entities = set()
         candidates = set()
 
+        num_docs = 0
+        doc_tags = defaultdict(int)
+
         log.info('Loading documents for corpus %s...', self.corpus_id)
         for i, doc in enumerate(self.parse()):
+            num_docs += 1
+            doc_tags[doc.tag] += 1
             if i % 100 == 0:
                 log.debug('Processed %i documents...', i)
 
@@ -55,6 +61,11 @@ class PrepareCorpus(object):
         section_delimiter = '-' * 40
         log.info(section_delimiter)
         log.info('CORPUS STATISTICS')
+        log.info(section_delimiter)
+        log.info('Docs                     = %i', num_docs)
+        for tag,count in doc_tags.iteritems():
+            log.info('\t%.1f%% %s (%i)', float(count*100) / num_docs, tag, count)
+
         log.info(section_delimiter)
         log.info('Total mentions           = %i', total_mentions)
         log.info('Total nil mentions (%%)   = %i (%.2f)', total_mentions - total_non_nil, float(total_mentions - total_non_nil) / total_mentions)
