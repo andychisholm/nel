@@ -7,7 +7,7 @@ import json
 from pymongo import MongoClient
 from flask import Flask, request, Response, abort, make_response
 from ..util import parmapper
-from ..doc import Doc, Candidate
+from ..doc import Doc, Chain, Candidate
 from ..linkers import LINKERS, RankingResolver
 from ..harness import format
 from ..process import cluster
@@ -76,13 +76,12 @@ class ServiceHarness(object):
 
 class BatchLink(object):
     """ Batch linking harness """
-    def __init__(self, corpus, tag, ranker, resolver, clusterer, fmt):
+    def __init__(self, corpus, tag, ranker, resolver, clusterer, fmt, output_path):
         self.corpus = corpus
         self.tag = tag
-        self.out_fh = sys.stdout
-        
         self.link = None
         self.clusterer = None
+        self.output_path = output_path
 
         if ranker:
             self.link = RankingResolver(ranker, resolver)
@@ -93,12 +92,25 @@ class BatchLink(object):
             'neleval':format.to_neleval
         }[fmt]
 
+    @classmethod
+    def add_arguments(cls, p):
+        p.add_argument('--corpus', metavar='CORPUS', required=True)
+        p.add_argument('--tag', metavar='TAG', default=None, required=False)
+        p.add_argument('--fmt', metavar='FORMAT', default='neleval', choices=['neleval'], required=False)
+        p.add_argument('--ranker', metavar='RANKER', default=None, required=False)
+        p.add_argument('--resolver', metavar='RESOLVER', default=None, required=False)
+        p.add_argument('--clusterer', metavar='CLUSTERER', default=None, required=False, choices=['name'])
+        p.add_argument('--output', dest='output_path', metavar='OUTPUT_PATH', required=True)
+        p.set_defaults(cls=cls)
+        return p
+
     def iter_results(self, query):
         for json_doc in query:
             doc = Doc.obj(json_doc)
             if self.link:
-                doc = self.clean(doc)
                 doc = self.link(doc)
+            else:
+                doc.chains = [Chain(mentions=[m], resolution=m.resolution) for c in doc.chains for m in c.mentions]
             yield doc
 
     def __call__(self):
@@ -115,25 +127,9 @@ class BatchLink(object):
         if self.link and self.clusterer:
             result_iter = self.clusterer(list(self.iter_results(query)))
 
-        for doc in result_iter:
-            out = self.fmt(doc).encode('utf-8')
-            if out:
-                print >>self.out_fh, out
+        with open(self.output_path, 'w') as f:
+            for doc in result_iter:
+                if doc.chains:
+                    f.write(self.fmt(doc).encode('utf-8')+'\n')
 
         log.info('Done.')
-
-    def clean(self, doc):
-        for c in doc.chains:
-            c.resolution = None
-        return doc
-
-    @classmethod
-    def add_arguments(cls, p):
-        p.add_argument('--corpus', metavar='CORPUS', required=True)
-        p.add_argument('--tag', metavar='TAG', default=None, required=False)
-        p.add_argument('--fmt', metavar='FORMAT', default='neleval', choices=['neleval'], required=False)
-        p.add_argument('--ranker', metavar='RANKER', default=None, required=False)
-        p.add_argument('--resolver', metavar='RESOLVER', default=None, required=False)
-        p.add_argument('--clusterer', metavar='CLUSTERER', default=None, required=False, choices=['name'])
-        p.set_defaults(cls=cls)
-        return p

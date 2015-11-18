@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 import os
 import sys
+import re
+import string
 
 from itertools import izip
 from time import time
 from bisect import bisect_left
-from schwa import dr
 from subprocess import Popen, PIPE
 from cStringIO import StringIO
 
@@ -19,86 +20,38 @@ log = logging.getLogger()
 
 class Tagger(Process):
     """ Tags and performs naive coref over mentions in tokenised text. """
-    @staticmethod
-    def cluster_mentions(mentions): 
-        chains = []
-        unchained_mentions = sorted(mentions, key=lambda m:m.begin, reverse=True)
-
-        #log.debug('MENTIONS: ' + ';'.join(m.text for m in unchained_mentions))
-        while unchained_mentions:
-            mention = unchained_mentions.pop(0)
-
-            potential_antecedents = [(m.text, m) for m in unchained_mentions if m.tag == mention.tag]
-            chain = [mention]
-
-            likely_acronym = False
-
-            if mention.text.upper() == mention.text:
-                # check if our mention is an acronym of a previous mention
-                for a, m in potential_antecedents:
-                    if (''.join(p[0] for p in a.split(' ') if p).upper() == mention.text) or \
-                       (''.join(p[0] for p in a.split(' ') if p and p[0].isupper()).upper() == mention.text):
-                        chain.insert(0, m)
-                        unchained_mentions.remove(m)
-                        likely_acronym = True
-                potential_antecedents = [(m.text, m) for m in unchained_mentions]
-
-            last = None
-            longest_mention = mention
-            while last != longest_mention and potential_antecedents:
-                # check if we are a prefix/suffix of a preceding mention
-                n = longest_mention.text.lower()
-                for a, m in potential_antecedents:
-                    na = a.lower()
-                    if (likely_acronym and mention.text == a) or \
-                       (not likely_acronym and (na.startswith(n) or na.endswith(n) or n.startswith(na) or n.endswith(na))):
-                        chain.insert(0, m)
-                        unchained_mentions.remove(m)
-                
-                last = longest_mention
-                longest_mention = sorted(chain, key=lambda m: len(m.text), reverse=True)[0]
-                potential_antecedents = [(m.text, m) for m in unchained_mentions if m.tag == mention.tag]
-
-            chains.append(Chain(mentions=chain))
-            #log.debug('CHAIN(%i): %s' % (len(potential_antecedents), ';'.join(m.text for m in chain)))
-        
-        return chains
-
     def __call__(self, doc):
-        doc.chains = self.cluster_mentions(self._tag(doc))
+        doc.chains = [Chain(mentions=[m]) for m in self.tag(doc)]
         return doc
 
-    def _tag(self, doc):
-        """Yield mention annotations."""
+    def tag(self, doc):
         raise NotImplementedError
 
-    def _mention_over_tokens(self, doc, i, j, tag=None):
-        """Create mention annotation from token i to token j-1."""
+    def mention_over_tokens(self, doc, i, j, tag=None):
         toks = doc.tokens[i:j]
         begin = toks[0].begin
         end = toks[-1].end
         text = doc.text[begin:end]
-
         return Mention(begin, text, tag)
 
-class CandidateGenerator(Process):
-    def __init__(self, candidate_model_tag):
-        self.candidates = recognition.Candidates(candidate_model_tag)
- 
-    def __call__(self, doc):
-        for chain in doc.chains:
-            forms = sorted(set(m.text for m in chain.mentions),key=len,reverse=True)
-            candidates = set()
-            for sf in forms:
-                candidates = candidates.union(self.candidates.search(sf))
-            chain.candidates = [Candidate(c) for c in candidates]
-        return doc
+    @classmethod
+    def iter_options(cls):
+        for c in globals().itervalues():
+            if c != cls and isinstance(c, type) and issubclass(c, cls):
+                yield c
 
 class CRFTagger(Tagger):
+    """ Conditional random field sequence tagger """
+    @classmethod
+    def add_arguments(cls, p):
+        p.add_argument('model_tag', metavar='MODEL_TAG')
+        return p
+
     def __init__(self, model_tag):
+        log.info('Loading CRF sequence classifier: %s', model_tag)
         self.tagger = recognition.SequenceClassifier(model_tag)
 
-    def _tag(self, doc):
+    def tag(self, doc):
         offset = 0
         doc.tokens = []
         for sentence in self.tagger.mapper.iter_sequences(doc):
@@ -113,15 +66,22 @@ class CRFTagger(Tagger):
             start = None
             for i, tag in enumerate(tags):
                 if start != None and tag != 'I':
-                    yield self._mention_over_tokens(doc, start, i + offset, 'UNK')
+                    yield self.mention_over_tokens(doc, start, i + offset, 'UNK')
                     start = None
                 if tag == 'B':
                     start = i + offset
             if start != None:
-                yield self._mention_over_tokens(doc, start, i + offset + 1, 'UNK')
+                yield self.mention_over_tokens(doc, start, i + offset + 1, 'UNK')
             offset += len(sentence)
 
 class StanfordTagger(Tagger):
+    """ Tag documents via a hosted Stanford NER service """
+    @classmethod
+    def add_arguments(cls, p):
+        p.add_argument('host', metavar='HOSTNAME')
+        p.add_argument('port', type=int, metavar='PORT')
+        return p
+
     def __init__(self, host, port):
         self.host = host
         self.port = port
@@ -140,7 +100,7 @@ class StanfordTagger(Tagger):
 
         return end
 
-    def _tag(self, doc):
+    def tag(self, doc):
         start_time = time()
         tokens = [t.text.replace('\n', ' ').replace('\r',' ') for t in doc.tokens]
  
@@ -195,44 +155,59 @@ class StanfordTagger(Tagger):
             for i, (txt, tag) in enumerate(izip(tokens,tags)):
                 if tag != last:
                     if last != 'O':
-                        yield self._mention_over_tokens(doc, start, i)
+                        yield self.mention_over_tokens(doc, start, i)
                     last = tag
                     start = i
                 i += 1
 
             if last != 'O':
-                yield self._mention_over_tokens(doc, start, i)
+                yield self.mention_over_tokens(doc, start, i)
 
         log.debug('Tagged doc (%s) with %i tokens in %.2fs', doc.id, len(doc.tokens), time() - start_time)
-
-# docrep schema used by the tokeniser and tagger
-class Token(dr.Ann):
-    raw = dr.Text()
-    norm = dr.Text()
-    pos = dr.Field()
-    lemma = dr.Field()
-    span = dr.Slice()
-    tidx = dr.Field()
-
-class NamedEntity(dr.Ann):
-    span = dr.Slice(Token)
-    label = dr.Field()
-
-class SchwaDoc(dr.Doc):
-    doc_id = dr.Field()
-    tokens = dr.Store(Token)
-    named_entities = dr.Store(NamedEntity)
 
 class SchwaTagger(Tagger):
     """ Tags named entities using the schwa docrep ner system (Dawborn, 15) """
     FLT_TAGS = ['date','cardinal','time','percent','ordinal','language','money','quantity']
     STARTUP_TIMEOUT = 30
+    schema = None
+ 
+    @classmethod
+    def add_arguments(cls, p):
+        p.add_argument('ner_package_path', metavar='NER_PACKAGE_PATH')
+        p.add_argument('tagger_path', metavar='TAGGER_PATH')
+        p.add_argument('tokenizer_path', metavar='TOKENIZER_PATH')
+        p.add_argument('ner_model_name', metavar='NER_MODEL_NAME')
+        return p
+
     def __init__(self, ner_package_path, tagger_path='schwa-ner-tagger', tokenizer_path='schwa-tokenizer', ner_model_name='conll12'):
         self.tagger_path = tagger_path
         self.tokenizer_path = tokenizer_path
         self.ner_package_path = ner_package_path
         self.ner_model_name = ner_model_name
-        self.schema = SchwaDoc.schema()
+
+        if self.schema == None:
+            # docrep schema used by the tokeniser and tagger
+            from schwa import dr
+
+            class Token(dr.Ann):
+                raw = dr.Text()
+                norm = dr.Text()
+                pos = dr.Field()
+                lemma = dr.Field()
+                span = dr.Slice()
+                tidx = dr.Field()
+
+            class NamedEntity(dr.Ann):
+                span = dr.Slice(Token)
+                label = dr.Field()
+
+            class SchwaDoc(dr.Doc):
+                doc_id = dr.Field()
+                tokens = dr.Store(Token)
+                named_entities = dr.Store(NamedEntity)
+
+            self.schema = SchwaDoc.schema()
+
         self.tagger_process = None
         self.initialise_tagger()
 
@@ -287,7 +262,7 @@ class SchwaTagger(Tagger):
             self.initialise_tagger()
             raise
 
-    def _tag(self, doc):
+    def tag(self, doc):
         raw = doc.text.encode('utf-8')
 
         # tagger returns byte offsets for tokens, we need unicode character offsets
@@ -298,4 +273,4 @@ class SchwaTagger(Tagger):
         for e in tagged_dr.named_entities:
             tag = e.label.lower()
             if tag not in self.FLT_TAGS:
-                yield self._mention_over_tokens(doc, e.span.start, e.span.stop, tag)
+                yield self.mention_over_tokens(doc, e.span.start, e.span.stop, tag)

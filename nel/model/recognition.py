@@ -46,36 +46,3 @@ class SequenceClassifier(object):
             'params': params,
             'metadata': metadata
         })
-
-class Candidates(object):
-    def __init__(self, tag, limit = 5):
-        self.mid = 'necounts[{:}]'.format(tag)
-        self.store = ObjectStore.Get('models:' + self.mid)
-        self.limit = limit
-
-        self.tei_store = ObjectStore.Get('models:tei['+tag+']')
-        self.count_model = ObjectStore.Get('models:ecounts['+tag+']')
-
-    def search(self, alias):
-        alias = self.normalise_alias(alias)
-        results = self.store.fetch(alias)
-
-        entities = []
-        if results:
-            entities = [k for k, v in sorted(results['counts'].iteritems(), key=lambda (k,v): v, reverse=True)][:self.limit]
-        ctx_entities = []
-
-        #ts = self.tei_store.fetch(alias)
-        ts = None
-        if ts:
-            ctx_entities = set(entities+[c for c, v in ts['entities'].iteritems() ])
-            #ctx_entities = set(entities+ts['entities'].keys())
-            counts = (i['count'] if i else 0 for i in self.count_model.fetch_many(ctx_entities))
-            entity_counts = dict(izip(ctx_entities, counts))
-            ctx_entities = sorted(ctx_entities, key=entity_counts.get, reverse=True)[:self.limit]
-
-        return list(set(entities+ctx_entities))
-
-    @staticmethod
-    def normalise_alias(name):
-        return name.lower().strip()

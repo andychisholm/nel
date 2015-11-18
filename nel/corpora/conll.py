@@ -15,7 +15,7 @@ DOCSTART_MARKER = '-DOCSTART-'
 @PrepareCorpus.Register
 class ConllPrepare(object):
     """ Tokenise and tag a conll document """
-    def __init__(self, conll_data_path, doc_type, redirect_model_tag, candidate_model_tag):
+    def __init__(self, conll_data_path, doc_type, redirect_model_tag):
         self.in_path = conll_data_path
         self.doc_predicate = {
             'all': lambda _: True,
@@ -24,7 +24,6 @@ class ConllPrepare(object):
             'test': self.is_test_doc
         }[doc_type]
         self.redirect_model_tag = redirect_model_tag
-        self.candidate_model_tag = candidate_model_tag
 
     @staticmethod
     def is_training_doc(doc_id):
@@ -39,50 +38,20 @@ class ConllPrepare(object):
     def __call__(self):
         """ Prepare documents """
         redirects = Redirects(self.redirect_model_tag)
-        generate_candidates = tag.CandidateGenerator(self.candidate_model_tag)
 
         log.info('Preparing conll documents...')
         for doc, conll_tags in self.iter_docs(self.in_path, self.doc_predicate):
-            mentions = []
-            for gold_entity, (start, end) in conll_tags:
-                m = Mention(start, doc.text[start:end])
-                m.resolution = redirects.map('en.wikipedia.org/wiki/' + gold_entity)
-                m.surface_form = doc.text[start:end].replace(' ,', ',')
-                mentions.append(m)
+            doc.chains = []
+            for gold_entity_id, (start, end) in conll_tags:
+                resolution = Candidate(redirects.map('en.wikipedia.org/wiki/' + gold_entity_id))
+                doc.chains.append(Chain(mentions=[
+                    Mention(start, doc.text[start:end], resolution=resolution)
+                ]))
 
-            chains = tag.Tagger.cluster_mentions(mentions)
-            unique_chains = []
-
-            # join chains with the same gold standard resolution, split chains with different gold resolution
-            # this requires gold annot information so is only valid if building the train set or isolating disambiguation performance
-            for chain in chains:
-                mbr = defaultdict(list)
-                for m in chain.mentions:
-                    mbr[m.resolution].append(m)
-                for r, ms in mbr.iteritems():
-                    unique_chains.append(Chain(mentions=ms, resolution=Candidate(r)))
-
-            doc.chains = unique_chains
-            doc = generate_candidates(doc)
-
-            """
-            for chain in doc.chains:
-                # longest mention string
-                sf = sorted(chain.mentions, key=lambda m: len(m.surface_form), reverse=True)[0].surface_form
-
-                cs = candidates.search(sf)
-                if cs:
-                    if chain.resolution.id not in cs:
-                        log.warn('Entity (%s) not in candidate set for (%s) in doc (%s).', chain.resolution.id, sf, doc.id)
-                    chain.candidates = [Candidate(e) for e in cs]
-                else:
-                    log.warn('Missing alias (%s): %s' % (doc.id, sf))
-            """
             yield doc
 
     @staticmethod
     def iter_docs(path, doc_id_predicate, redirect_model = None, max_docs = None):
-        """ Read AIDA-CoNLL formatted documents """
         redirect_model = redirect_model or {}
 
         with open(path, 'rd') as f:
@@ -139,6 +108,5 @@ class ConllPrepare(object):
         p.add_argument('conll_data_path', metavar='CONLL_DATA')
         p.add_argument('doc_type', metavar='DOC_TYPE', choices='all,train,dev,test')
         p.add_argument('--redirect_model_tag', required=False, default='wikipedia', metavar='REDIRECT_MODEL_TAG')
-        p.add_argument('--candidate_model_tag', required=False, default='wikipedia', metavar='CANDIDATE_MODEL_TAG')
         p.set_defaults(parsecls=cls)
         return p

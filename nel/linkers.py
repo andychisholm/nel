@@ -5,7 +5,8 @@ import math
 
 from time import time
 from .process.resolve import GreedyOverlapResolver
-from .process.tag import SchwaTagger, StanfordTagger, CandidateGenerator
+from .process.tag import SchwaTagger, StanfordTagger
+from .process.candidates import CandidateGenerator
 from .process.tokenise import RegexTokeniser, TOKEN_RE
 from .process.resolve import FeatureRankResolver
 from .process.process import Pipeline

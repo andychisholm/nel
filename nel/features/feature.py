@@ -4,8 +4,13 @@ from ..process.process import Process
 FEATURE_SET = set()
 
 class Feature(object):
+    """ Extract features for candidates of chains in a documents. """
     def __init__(self):
         self._tag = None
+
+    @classmethod
+    def iter_options(cls):
+        return FEATURE_SET
 
     @staticmethod
     def Extractable(c):

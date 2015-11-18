@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import math
+
 from .feature import Feature
 from ..model import disambiguation
+from ..process.candidates import CandidateGenerator
 
 import logging
 log = logging.getLogger()
@@ -37,26 +39,19 @@ class NameProbability(LogFeature):
         self.npm = disambiguation.NameProbability(self.tag)
 
     def compute_doc_state(self, doc):
-        sfs = set(m.text.lower() for c in doc.chains for m in c.mentions)
-        probs_by_sf = self.npm.get_probs_for_names(sfs)
-
-        probs_by_chain = {}
-        for chain in doc.chains:
-            names = set(m.text.lower() for m in chain.mentions)
-            names = sorted(names, key=len, reverse=True)
-            sf = None
-            for name in names:
-                # todo: refactor - depending on the store, this can be a fairly wasteful lookup
-                if probs_by_sf[name]:
-                    sf = name
-                    break
-            # we take the longest non-zero name, or the longest name if all are zeros
-            probs_by_chain[chain] = probs_by_sf[sf or names[0]]
-
-        return probs_by_chain
+        sfs = set()
+        for c in doc.chains:
+            for m in c.mentions:
+                sfs.update(CandidateGenerator.get_normalised_forms(m.text))
+        return self.npm.get_probs_for_names(sfs)
 
     def compute_raw(self, doc, chain, candidate, state):
-        return state[chain].get(candidate.id, 1e-10)
+        p = 1e-10
+        for m in chain.mentions:
+            for sf in CandidateGenerator.get_normalised_forms(m.text):
+                if candidate.id in state[sf]:
+                    p = max(state[sf][candidate.id], p)
+        return p
 
     @classmethod
     def add_arguments(cls, p):
