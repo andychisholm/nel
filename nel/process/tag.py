@@ -183,6 +183,7 @@ class SchwaTagger(Tagger):
         return p
 
     def __init__(self, ner_package_path, tagger_path='schwa-ner-tagger', tokenizer_path='schwa-tokenizer', ner_model_name='conll12'):
+        log.info('Initialising libschwa tagger...')
         self.tagger_path = tagger_path
         self.tokenizer_path = tokenizer_path
         self.ner_package_path = ner_package_path
@@ -232,6 +233,7 @@ class SchwaTagger(Tagger):
         log.info('Schwa tagger startup completed in %.1fs', time() - t)
 
     def text_to_dr(self, text):
+        from schwa import dr
         tokenizer = Popen([
             self.tokenizer_path,
             '-p', 'docrep'
