@@ -41,7 +41,7 @@ class TrainSequenceClassifier(object):
 
         log.info('Extracting features for training instances...')
         for doc in docs:
-            gold_mentions = sorted((m.begin,m.end) for c in doc.chains for m in c.mentions)
+            gold_mentions = sorted((m.begin,m.end,m.tag) for c in doc.chains for m in c.mentions)
             for s in self.feature_extractor.iter_sequences(doc):
                 features = self.feature_extractor.sequence_to_instance(doc, s)
                 labels = list(self.iter_aligned_labels(s, gold_mentions))
@@ -67,17 +67,24 @@ class TrainSequenceClassifier(object):
     @staticmethod
     def iter_aligned_labels(sequence, mentions):
         end = None
-        next_start, next_end = (None,None) if not mentions else mentions[0]
+        tag = None
+        next_start, next_end, next_tag = (None,None,None) if not mentions else mentions[0]
         for token in sequence:
             label = 'O'
             if next_start != None and (token.idx >= next_start or next_start < (token.idx+len(token.text))):
-                label = 'B'
                 end = next_end
+                tag = next_tag
+                label = 'B'
+                if tag != None:
+                    label += '-' + tag
+
                 mentions.pop(0)
-                next_start, next_end = (None,None) if not mentions else mentions[0]
+                next_start, next_end, next_tag = (None,None,None) if not mentions else mentions[0]
             elif end != None:
                 if token.idx < end:
                     label = 'I'
+                    if tag != None:
+                        label += '-' + tag
                 else:
                     end = None
             yield label

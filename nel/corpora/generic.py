@@ -35,14 +35,18 @@ class MarkdownPrepare(object):
             for line in f:
                 parts = line.decode(ENC).strip().split('\t')
 
+                tag = None
                 resolution_id = None
                 if len(parts) > 3 and parts[3].strip():
                     resolution_id = 'en.wikipedia.org/wiki/' + normalise_wikipedia_link(parts[3])
                     resolution_id = self.redirect_model.map(resolution_id)
+                if len(parts) > 5:
+                    tag = parts[5].lower().strip()
 
                 yield {
                     'doc': parts[0],
                     'span': slice(int(parts[1]), int(parts[2])),
+                    'tag': tag,
                     'resolution': {
                         'id': resolution_id
                     }
@@ -87,7 +91,8 @@ class MarkdownPrepare(object):
                 mentions.append(Mention(
                     begin=m['span'].start,
                     text=d['text'][m['span']],
-                    resolution=Candidate(resolution) if resolution else None))
+                    resolution=Candidate(resolution) if resolution else None,
+                    tag=m['tag']))
             doc.chains = [Chain(mentions=[m]) for m in mentions]
             yield doc
 

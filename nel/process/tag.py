@@ -63,15 +63,18 @@ class CRFTagger(Tagger):
                 doc.tokens.append(Mention(t.idx+i, t.text))
 
             tags = self.tagger.tag(doc, sentence)
-            start = None
+            start, tag_type = None, None
             for i, tag in enumerate(tags):
-                if start != None and tag != 'I':
-                    yield self.mention_over_tokens(doc, start, i + offset, 'UNK')
-                    start = None
-                if tag == 'B':
+                if start != None and tag[0] != 'I':
+                    yield self.mention_over_tokens(doc, start, i + offset, tag_type)
+                    start, tag_type = None, None
+                if tag[0] == 'B':
+                    parts = tag.split('-')
+                    if len(parts) == 2:
+                        tag_type = parts[1]
                     start = i + offset
             if start != None:
-                yield self.mention_over_tokens(doc, start, i + offset + 1, 'UNK')
+                yield self.mention_over_tokens(doc, start, i + offset + 1, tag_type)
             offset += len(sentence)
 
 class StanfordTagger(Tagger):
