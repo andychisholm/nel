@@ -33,7 +33,6 @@ setup(
         "argparse",
         "functools32",
         "itsdangerous",
-        "libschwa-python",
         "msgpack-python",
         "numpy",
         "python-crfsuite",
