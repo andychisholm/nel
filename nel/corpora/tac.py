@@ -7,7 +7,7 @@ from collections import defaultdict
 from .prepare import PrepareCorpus
 from ..doc import Doc, Chain, Mention, Candidate
 from ..model.corpora import Redirects
-from ..process.tag import Tagger, StanfordTagger, CandidateGenerator
+from ..process.tag import Tagger, StanfordTagger
 from ..process.tokenise import RegexTokeniser, TOKEN_RE
 from ..harness.format import markup_to_whitespace
 
@@ -19,15 +19,11 @@ ENC = 'utf8'
 @PrepareCorpus.Register
 class TacPrepare(object):
     """ Prepare a set of docrep TAC query documents """
-    def __init__(self, mentions_path, links_path, docs_path, candidate_model_tag, redirect_model_tag, gold_mentions):
+    def __init__(self, mentions_path, links_path, docs_path, redirect_model_tag):
         self.mentions_path = mentions_path
         self.links_path = links_path
         self.docs_path = docs_path
-        self.candidate_model_tag = candidate_model_tag
         self.redirect_model_tag = redirect_model_tag
-        self.gold_mentions = gold_mentions
-        if self.gold_mentions:
-            log.info("Using gold standard mentions")
 
     def __call__(self):
         log.info('Joining tac queries and links...')
@@ -39,18 +35,12 @@ class TacPrepare(object):
         for m in mentions_by_id.itervalues():
             mentions_by_doc[m['doc']].append(m)
 
-        generate_candidates = CandidateGenerator(self.candidate_model_tag)
-
-        if not self.gold_mentions:
-            # todo: parameterise tagger/candidate gen config
-            tokeniser = RegexTokeniser(TOKEN_RE)
-            tagger = StanfordTagger(host='127.0.0.1', port=1447)
-
         log.info('Preparing tac documents...')
         for d in self.iter_docs():
             log.info("Preparing doc: %s ...", d['id'])
             doc = Doc(doc_id=d['id'],text=d['text'])
-            mentions = []
+            doc.chains = []
+
             for m in mentions_by_doc[d['id']]:
                 if d['text'][m['span']] != m['text']:
                     if d['text'][m['span']].strip() == '':
@@ -58,23 +48,12 @@ class TacPrepare(object):
                         log.warn('Mention span mismatch - likely annotated markup [%s] (%s)', d['id'], m['text'])
                     else:
                         log.warn("Mention span mismatch [%s] (%s!=%s)", d['id'], d['text'][m['span']], m['text'])
-                mention = Mention(m['span'].start, d['text'][m['span']])
-                mention.resolution = m['resolution']['id']
-                mentions.append(mention)
 
-            if self.gold_mentions:
-                doc.chains = Tagger.cluster_mentions(mentions)
-                unique_chains = []
-                for chain in doc.chains:
-                    mbr = defaultdict(list)
-                    for m in chain.mentions:
-                        mbr[m.resolution].append(m)
-                    for r, ms in mbr.iteritems():
-                        unique_chains.append(Chain(mentions=ms, resolution=Candidate(r)))
-                doc.chains = unique_chains
-            else:
-                doc = tagger(tokeniser(doc))
-            doc = generate_candidates(doc)
+                resolution = Candidate(m['resolution']['id']) if m['resolution']['id'] else None
+                doc.chains.append(Chain(
+                    mentions=[Mention(m['span'].start, d['text'][m['span']], tag=m['tag'], resolution=resolution)]
+                ))
+
             yield doc
 
     def iter_mentions(self):
@@ -89,7 +68,8 @@ class TacPrepare(object):
                 'id': mid,
                 'doc': docid,
                 'text': txt,
-                'span': slice(begin, end)
+                'span': slice(begin, end),
+                'tag': None
             }
 
     def iter_links(self):
@@ -139,9 +119,6 @@ class TacPrepare(object):
         p.add_argument('mentions_path', metavar='QUERY_XML_PATH')
         p.add_argument('links_path', metavar='LINKS_TSV_PATH')
         p.add_argument('docs_path', metavar='SOURCE_DOCS_PATH')
-        p.add_argument('--candidate_model_tag', metavar='CANDIDATE_MODEL', required=False, default='wikipedia')
         p.add_argument('--redirect_model_tag', default='tac', required=False, metavar='REDIRECT_MODEL')
-        p.add_argument('--gold-mentions', action='store_true')
-        p.set_defaults(gold_mentions=False)
         p.set_defaults(parsecls=cls)
         return p
