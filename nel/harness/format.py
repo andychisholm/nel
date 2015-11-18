@@ -145,9 +145,14 @@ def mention_to_neleval(doc, chain, mention):
     default_probability = 1.0
     default_type = 'UNK'
 
-    result = u'\t'.join([doc.id, str(mention.begin), str(mention.end)]) + '\t'
-    if chain.resolution:
-        result += u'\t'.join([chain.resolution.id, str(default_probability), default_type])
+    result = u'\t'.join([
+        doc.id,
+        str(mention.begin),
+        str(mention.end),
+        chain.resolution.id if chain.resolution else 'NIL',
+        str(default_probability),
+        mention.tag if mention.tag else 'UNK'
+    ])
 
     return result
 
