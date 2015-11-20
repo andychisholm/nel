@@ -31,7 +31,7 @@ class TrainLinearRanker(TrainMentionClassifier):
 
         # todo: parameterise instance selection parameters
         self.sample_instances = sample_by_magnitude
-        self.instance_limit = 10
+        self.instance_limit = None
 
     def iter_instances(self, docs):
         return self.iter_pairwise_instances_with_sampling(docs, self.sample_instances, self.instance_limit)
@@ -39,7 +39,7 @@ class TrainLinearRanker(TrainMentionClassifier):
     def init_model(self):
         # todo: parameterise hyperparams
         hparams = {
-            'C': 0.0316228,
+            'C': 0.01,
             'penalty': 'l2',
             'loss': 'hinge',
             'class_weight': 'auto',
@@ -53,20 +53,26 @@ class TrainLinearRanker(TrainMentionClassifier):
         toggle = True
 
         for doc in docs:
-            for mention in doc.chains:
-                if mention.resolution == None:
+            for chain in doc.chains:
+                resolution = chain.mentions[0].resolution
+                resolution = resolution.id if resolution else None
+                for m in chain.mentions:
+                    if (m.resolution.id if m.resolution else None) != resolution:
+                        raise Exception('Invalid chain assignment for training set mention...')
+
+                if resolution == None:
                     # ranking model can't learn from NILs
                     continue
 
                 positive = None
                 negatives = []
-                for c in mention.candidates:
-                    if c.id == mention.resolution.id:
+                for c in chain.candidates:
+                    if c.id == resolution:
                         positive = c.fv
                     else:
                         negatives.append(c.fv)
 
-                # if true reolution isn't in the candidate set we can't compute pairwise differences
+                # if gold reolution isn't in the candidate set we can't learn from pairwise differences
                 if type(positive) == type(None):
                     # weird if statement here just avoids numpy None comparison madness
                     continue

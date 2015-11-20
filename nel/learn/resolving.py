@@ -98,10 +98,10 @@ class TrainLinearResolver(TrainMentionClassifier):
                     # skip mentions without candidates
                     continue
 
-                for _ in chain.mentions:
-                    if chain.resolution:
+                for mention in chain.mentions:
+                    if mention.resolution:
                         for c in chain.candidates:
-                            if c.id == chain.resolution.id:
+                            if c.id == mention.resolution.id:
                                 yield c.fv, self.NON_NIL_CLS
                                 break
                     else:

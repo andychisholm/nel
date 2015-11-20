@@ -27,7 +27,7 @@ class TrainSequenceClassifier(object):
 
         log.info('Initialising feature extractors...')
         params = {
-            'window': (-1, 0)
+            'window': (-1, 1)
         }
         self.feature_extractor = recognition.SequenceFeatureExtractor(**params)
 
@@ -35,7 +35,7 @@ class TrainSequenceClassifier(object):
         trainer.set_params({
             'c1': 1.,
             'c2': 0.001,
-            'max_iterations': 250,
+            'max_iterations': 100,
             'feature.possible_transitions': True
         })
 
