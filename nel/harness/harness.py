@@ -121,7 +121,12 @@ class BatchLink(object):
             flt['tag'] = self.tag
         
         query = store.find(flt)
-        log.info('Linking %i %s%s documents...', query.count(), self.corpus, (' '+self.tag) if self.tag else '')
+        log.info(
+            'Writing %s linking output for %i docs from %s%s to: %s...',
+            'system' if self.link else 'gold',
+            query.count(),
+            self.corpus, (' '+self.tag) if self.tag else '',
+            self.output_path)
 
         result_iter = self.iter_results(query)
         if self.link and self.clusterer:
@@ -131,5 +136,3 @@ class BatchLink(object):
             for doc in result_iter:
                 if doc.chains:
                     f.write(self.fmt(doc).encode('utf-8')+'\n')
-
-        log.info('Done.')
