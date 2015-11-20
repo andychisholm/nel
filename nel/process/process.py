@@ -120,7 +120,7 @@ class CorpusMapper(object):
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('--corpus', metavar='CORPUS')
+        p.add_argument('--corpus', metavar='CORPUS', required=True)
         p.add_argument('--tag', default=None, required=False, metavar='TAG_FILTER')
         p.add_argument('--output-corpus', default=None, required=False, metavar='OUTPUT_CORPUS')
         p.add_argument('--processes', default=None, required=False, type=int, metavar='PROCESS_COUNT')
