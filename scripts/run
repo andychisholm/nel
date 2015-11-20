@@ -1,99 +1,122 @@
 #!/bin/bash
 set -e
+export NEL_DATASTORE_URI=redis://localhost
 
-APP=$NEL_ROOT/run
+OUTPUT_PATH=output
 
-OUTPUT_PATH=$NEL_ROOT/output/
-MODEL_PATH=/data0/linking/models
-
-PRIOR_MODEL_PATH=$MODEL_PATH/wikipedia.entity.model
-NAME_MODEL_PATH=$MODEL_PATH/wikipedia.name.model
-ENTITY_CTX_TF_PATH=$MODEL_PATH/wikipedia.entity_context.w_none.tf.model
-ENTITY_CTX_IDF_PATH=$MODEL_PATH/wikipedia.entity_context.w_none.idf.model
-OCCURRENCE_MODEL_PATH=$MODEL_PATH/wikipedia.occurrence.model
-
-CORPUS=conll
-RANKER_NAME=default
+TAGGER_NAME=crf
+RANKER_NAME=ranker
 RERANKER_NAME=reranker
+RESOLVER_NAME=resolver
+ENTITY_COUNT_MODEL=wikipedia
+NAME_COUNT_MODEL=wikipedia
+EMBEDDING_MODEL=wikipedia
+
+TRAIN_CORPUS=conll
+EVAL_TAG=test
+
+TAGGED_CORPUS=$TRAIN_CORPUS[$TAGGER_NAME]
+CORPUS=$TRAIN_CORPUS
 
 RANKER_FEATURE=ClassifierScore[$RANKER_NAME]
 RERANKER_FEATURE=ClassifierScore[$RERANKER_NAME]
+RESOLVER_FEATURE=ClassifierScore[$RESOLVER_NAME]
+LINKING_FEATURE=$RERANKER_FEATURE
 
-EXTRACT_FEATURES=false
-TRAIN_RANKER=false
-EXTRACT_COHERENCE=false
-TRAIN_RERANKER=false
+#TRAIN_TAGGER=true
+#TAG_CORPUS=true
+#CORPUS=$TAGGED_CORPUS
+
+GENERATE_CANDIDATES=true
+EXTRACT_RANKING_FEATURES=true
+TRAIN_RANKER=true
+EXTRACT_RANKER_FEATURE=true
+EXTRACT_RERANKING_FEATURES=true
+TRAIN_RERANKER=true
+EXTRACT_RERANKER_FEATURE=true
+TRAIN_RESOLVER=true
+EXTRACT_RESOLVER_FEATURE=true
+
+RUN_RESOLVER=true
 RUN_EVAL=true
 
-LINKING_FEATURE=$RANKER_FEATURE
+RANKING_FEATURE_PARAMS="\
+    --feature EntityProbability[$ENTITY_COUNT_MODEL] \
+    --feature NameProbability[$NAME_COUNT_MODEL]"
+RERANKING_FEATURE_PARAMS="\
+    $RANKING_FEATURE_PARAMS \
+    --feature $RANKER_FEATURE \
+    --feature EmbeddingCoherence[$EMBEDDING_MODEL][$RANKER_FEATURE]"
+RESOLVER_FEATURE_PARAMS=$RERANKING_FEATURE_PARAMS
 
-if $EXTRACT_FEATURES; then
-    $APP extract-feature \
-        --corpus $CORPUS \
-        EntityProbability \
-            $PRIOR_MODEL_PATH
+GOLD_OUTPUT_PATH=$OUTPUT_PATH/$TRAIN_CORPUS[$EVAL_TAG].gold.tsv
+SYSTEM_OUTPUT_PATH=$OUTPUT_PATH/$CORPUS[$EVAL_TAG].system.tsv
 
-    $APP extract-feature \
-        --corpus $CORPUS \
-        NameProbability \
-            $NAME_MODEL_PATH
-
-    $APP extract-feature \
-        --corpus $CORPUS \
-        BoWMentionContext \
-            full \
-            $ENTITY_CTX_IDF_PATH \
-            $ENTITY_CTX_TF_PATH
+# ENTITY RECOGNITION
+if [[ -n $TRAIN_TAGGER ]]; then
+    nel train-sequence-classifier $TAGGER_NAME --corpus $TRAIN_CORPUS --tag train
+fi
+if [[ -n $TAG_CORPUS ]]; then
+    nel tag-documents --corpus $TRAIN_CORPUS --output-corpus $TAGGED_CORPUS CRFTagger $TAGGER_NAME
+fi
+if [[ -n $GENERATE_CANDIDATES ]]; then
+    nel cluster-mentions --corpus $CORPUS SpanOverlap
+    nel generate-candidates --corpus $CORPUS NameCounts $NAME_COUNT_MODEL
 fi
 
-if $TRAIN_RANKER; then
-    $APP train \
-        $RANKER_NAME \
-        --corpus $CORPUS \
-        --feature EntityProbability \
-        --feature NameProbability \
-        --feature BoWMentionContext
-
-    $APP extract-feature \
-        --corpus $CORPUS \
-        ClassifierScore \
-            $RANKER_NAME
+# RANKING
+if [[ -n $EXTRACT_RANKING_FEATURES ]]; then
+    nel extract-feature --corpus $CORPUS EntityProbability $ENTITY_COUNT_MODEL
+    nel extract-feature --corpus $CORPUS NameProbability $NAME_COUNT_MODEL
+fi
+if [[ -n $TRAIN_RANKER ]]; then
+    nel train-linear-ranker $RANKER_NAME --corpus $TRAIN_CORPUS --tag train $RANKING_FEATURE_PARAMS
+fi
+if [[ -n $EXTRACT_RANKER_FEATURE ]]; then
+    nel extract-feature --corpus $CORPUS ClassifierScore $RANKER_NAME
 fi
 
-if $EXTRACT_COHERENCE; then
-    $APP extract-feature
-        MeanConditionalProbability
-            ClassifierScore[$RANKER_NAME]
-            $OCCURRENCE_MODEL_PATH
-    
-    $APP train \
-        $RERANKER_NAME \
-        --corpus $CORPUS \
-        --feature EntityProbability \
-        --feature NameProbability \
-        --feature BoWMentionContext \
-        --feature ClassifierScore[$RANKER_NAME] \
-        --feature MeanConditionalProbability[ClassifierScore[$RANKER_NAME]]
-
-    $APP extract-feature \
-        --corpus $CORPUS
-        ClassifierScore
-            $RERANKER_NAME
+# RERANKING
+if [[ -n $EXTRACT_RERANKING_FEATURES ]]; then
+    nel extract-feature --corpus $CORPUS EmbeddingCoherence $EMBEDDING_MODEL $RANKER_FEATURE
+fi
+if [[ -n $TRAIN_RERANKER ]]; then
+    nel train-linear-ranker $RERANKER_NAME --corpus $TRAIN_CORPUS --tag train $RERANKING_FEATURE_PARAMS
+fi
+if [[ -n $EXTRACT_RERANKER_FEATURE ]]; then
+    nel extract-feature --corpus $CORPUS ClassifierScore $RERANKER_NAME
 fi
 
-if $RUN_EVAL; then
-    $APP batch-link \
+# NIL RESOLUTION
+if [[ -n $TRAIN_RESOLVER ]]; then
+    nel train-linear-resolver --corpus $TRAIN_CORPUS --tag train $RESOLVER_FEATURE_PARAMS --ranker $LINKING_FEATURE $RESOLVER_NAME
+fi
+if [[ -n $EXTRACT_RESOLVER_FEATURE ]]; then
+    nel extract-feature --corpus $CORPUS ClassifierScore $RESOLVER_NAME
+fi
+
+# EVALUATION
+if [[ -n $RUN_EVAL ]]; then
+    nel batch-link --corpus $TRAIN_CORPUS --tag $EVAL_TAG --fmt neleval --output $GOLD_OUTPUT_PATH
+    RESOLVER_PARAM=
+    if [[ -n $RUN_RESOLVER ]]; then
+        RESOLVER_PARAM="--resolver $RESOLVER_FEATURE"
+    fi
+    nel batch-link \
         --corpus $CORPUS \
-        --tag test \
+        --tag $EVAL_TAG \
         --fmt neleval \
         --ranker $LINKING_FEATURE \
-        > $OUTPUT_PATH/system.test.tsv
-
+        $RESOLVER_PARAM \
+        --output $SYSTEM_OUTPUT_PATH
     neleval evaluate \
         -m strong_mention_match \
+        -m strong_typed_mention_match \
+        -m strong_linked_mention_match \
+        -m strong_nil_match \
         -m strong_link_match \
         -m entity_match \
         -f tab \
-        -g $OUTPUT_PATH/gold.test.tsv \
-        $OUTPUT_PATH/system.test.tsv
+        -g $GOLD_OUTPUT_PATH \
+        $SYSTEM_OUTPUT_PATH
 fi
