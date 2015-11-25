@@ -8,9 +8,9 @@ from pymongo import MongoClient
 from flask import Flask, request, Response, abort, make_response
 from ..util import parmapper
 from ..doc import Doc, Chain, Candidate
-from ..linkers import LINKERS, RankingResolver
 from ..harness import format
-from ..process import cluster
+from ..process import cluster, resolve
+from ..process.pipeline import Pipeline
 
 import logging
 log = logging.getLogger()
@@ -19,19 +19,19 @@ class ServiceHarness(object):
     """ Harness hosting a REST linking endpoint. """
     Instance = None
     App = Flask(__name__)
-    def __init__(self, **kwargs):
+    def __init__(self, config_path, host, port):
         ServiceHarness.Instance = self
-        self.host = kwargs.pop('host')
-        self.port = int(kwargs.pop('port'))
-        self.linker = kwargs.pop('linkcls')(**kwargs)
-    
+        self.linker = Pipeline.load(config_path)
+        self.host = host
+        self.port = port
+
     @staticmethod
     @App.route('/', methods=['POST'])
     def handler():
         return ServiceHarness.Instance.process(request.get_json(True))
 
     def __call__(self):
-        ServiceHarness.App.run(host='0.0.0.0',port=self.port)
+        ServiceHarness.App.run(host=self.host, port=self.port)
 
     def read(self, doc):
         if doc['type'] == 'text/plain':
@@ -54,24 +54,12 @@ class ServiceHarness(object):
             abort(make_response("Invalid or unset response format requested.", 422))
 
         return Response(formatter(doc).encode('utf-8'),  mimetype=mimetype)
-    
+
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('host', metavar='HOST')
-        p.add_argument('port', metavar='PORT')
-
-        sp = p.add_subparsers()
-        for linkcls in LINKERS:
-            name = linkcls.__name__
-            help_str = linkcls.__doc__.split('\n')[0]
-            desc = textwrap.dedent(linkcls.__doc__.rstrip())
-            csp = sp.add_parser(name,
-                                help=help_str,
-                                description=desc,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
-            linkcls.add_arguments(csp)
-
-        p.set_defaults(cls=cls)
+        p.add_argument('config_path', metavar='PIPELINE_CONFIG_PATH')
+        p.add_argument('host', default='0.0.0.0', metavar='HOST')
+        p.add_argument('port', default=8000, type=int, metavar='PORT')
         return p
 
 class BatchLink(object):
@@ -84,7 +72,7 @@ class BatchLink(object):
         self.output_path = output_path
 
         if ranker:
-            self.link = RankingResolver(ranker, resolver)
+            self.link = resolve.FeatureRankResolver(ranker, resolver)
         if self.clusterer:
             self.clusterer = cluster.get(clusterer)
 

@@ -15,15 +15,6 @@ class Process(object):
         """Add annotations to doc and return it"""
         raise NotImplementedError
 
-class Pipeline(object):
-    def __init__(self, processors):
-        self.processors = processors
-
-    def __call__(self, doc):
-        for c in self.processors:
-            doc = c(doc)
-        return doc
-
 class CorpusMapper(object):
     "Load, process and store documents."
     def __init__(self, **kwargs):

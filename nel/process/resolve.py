@@ -5,7 +5,15 @@ from ..util import spanset_insert
 import logging
 log = logging.getLogger()
 
-class FeatureRankResolver(Process):
+class Resolver(Process):
+    """ Assigns resolutions to chains in a document """
+    @classmethod
+    def iter_options(cls):
+        yield FeatureRankResolver
+        yield GreedyOverlapResolver
+
+class FeatureRankResolver(Resolver):
+    """ Ranks candidates and resolves nils via previously computed feature values """
     def __init__(self, ranking_feature, resolving_feature = None, resolving_threshold = 0.5):
         self.ranking_feature = ranking_feature
         self.resolving_feature = resolving_feature
@@ -20,7 +28,7 @@ class FeatureRankResolver(Process):
                     m.resolution = top_candidate
         return doc
 
-class GreedyOverlapResolver(Process):
+class GreedyOverlapResolver(Resolver):
     def __init__(self, feature):
         self.feature = feature
 

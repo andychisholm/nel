@@ -1,51 +1,63 @@
-{
-    "tagger": {
-        "name": "stanford",
-        "params": {
-            "host": "127.0.0.1",
-            "port": 1447
-        }
-    },
-    "candidate_generation": {
-        "name": "CandidateGenerator",
-        "params": {
-            "candidate_model_tag": "wikipedia"
-        }
-    },
-    "features": [{
-            "name": "EntityProbability",
-            "params": {
-                "entity_prior_model_tag": "wikipedia"
-            }
-        }, {
-            "name":"NameProbability",
-            "params": {
-                "name_model_tag": "wikipedia"
-            }
-        }, {
-            "name": "BoWMentionContext",
-            "params": {
-                "context_model_tag": "wikipedia"
-            }
-        }, {
-            "name":"ClassifierScore",
-            "params": {
-                "classifier_id": "default"
-            }
-        }, {
-            "name":"MeanConditionalProbability",
-            "params": {
-                "ranker": "ClassifierScore[default]",
-                "occurrence_model_path": "/data0/linking/models/wikipedia.occurrence.model"
-            }
-        }, {
-            "name": "ClassifierScore",
-            "params": {
-                "classifier_id": "reranker"
-            }
-        }
-    ],
-    "resolver": {
-        "feature": "ClassifierScore[reranker]"
+[{
+    "type": "Tagger",
+    "name": "CRFTagger",
+    "params": {
+        "model_tag": "crf"
     }
-}
+}, {
+    "type": "MentionClusterer",
+    "name": "SpanOverlap",
+    "params": {}
+}, {
+    "type": "CandidateGenerator",
+    "name": "NameCounts",
+    "params": {
+        "name_model_tag": "wikipedia",
+        "limit": 15
+    }
+}, {
+    "type": "Feature",
+    "name": "EntityProbability",
+    "params": {
+        "entity_model_tag": "wikipedia"
+    }
+}, {
+    "type": "Feature",
+    "name": "NameProbability",
+    "params": {
+        "name_model_tag": "wikipedia"
+    }
+}, {
+    "type": "Feature",
+    "name": "ClassifierScore",
+    "params": {
+        "classifier": "ranker"
+    }
+}, {
+    "type": "Feature",
+    "name": "EmbeddingCoherence",
+    "params": {
+        "embedding_model_tag": "wikipedia",
+        "ranking_feature": "ClassifierScore[ranker]"
+    }
+}, {
+    "type": "Feature",
+    "name": "ClassifierScore",
+    "params": {
+        "classifier": "reranker"
+    }
+}, {
+    "type": "Feature",
+    "name": "ClassifierScore",
+    "params": {
+        "classifier": "resolver"
+    }
+}, {
+    "type": "Resolver",
+    "name": "FeatureRankResolver",
+    "params": {
+        "ranking_feature": "ClassifierScore[reranker]",
+        "resolving_feature": "ClassifierScore[resolver]",
+        "resolving_threshold": 0.5
+    }
+}]
