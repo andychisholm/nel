@@ -18,3 +18,4 @@ six==1.9.0
 wsgiref==0.1.2
 Pattern==2.6
 ujson==1.33
+spacy==0.98

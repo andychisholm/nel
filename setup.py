@@ -44,7 +44,8 @@ setup(
         "six",
         "wsgiref",
         "ujson",
-        "progressbar2"
+        "progressbar2",
+        "spacy"
     ],
     test_suite = __pkg_name__ + '.test'
 )
