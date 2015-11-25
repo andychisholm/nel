@@ -43,7 +43,8 @@ setup(
         "scipy",
         "six",
         "wsgiref",
-        "ujson"
+        "ujson",
+        "progressbar2"
     ],
     test_suite = __pkg_name__ + '.test'
 )
