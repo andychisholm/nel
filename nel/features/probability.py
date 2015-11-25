@@ -18,8 +18,8 @@ class LogFeature(Feature):
 @Feature.Extractable
 class EntityProbability(LogFeature):
     """ Entity prior probability. """
-    def __init__(self, entity_prior_model_tag):
-        self.tag = entity_prior_model_tag
+    def __init__(self, entity_model_tag):
+        self.tag = entity_model_tag
         self.em = disambiguation.EntityCounts(self.tag)
 
     def compute_raw(self, doc, chain, candidate, state):
@@ -27,7 +27,7 @@ class EntityProbability(LogFeature):
 
     @classmethod
     def add_arguments(cls, p):
-        p.add_argument('entity_prior_model_tag', metavar='ENTITY_MODEL_TAG')
+        p.add_argument('entity_model_tag', metavar='ENTITY_MODEL_TAG')
         p.set_defaults(featurecls=cls)
         return p
 
