@@ -5,7 +5,7 @@ __nel__ is an fast, accurate and highly modular framework for linking entities i
 
 ### Getting Started
 
-Documentation for the latest release is available online via: [nel.readthedocs.org](http://nel.readthedocs.org/en/latest/).
+Documentation for the last release is available online via: [nel.readthedocs.org](http://nel.readthedocs.org/en/latest/).
 
 ### Citation
 
