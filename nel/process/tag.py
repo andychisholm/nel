@@ -58,7 +58,7 @@ class CRFTagger(Tagger):
             for t in sentence:
                 i = 0
                 for i, c in enumerate(doc.text[t.idx:t.idx+len(t.text)]):
-                    if c != ' ':
+                    if c.isalnum():
                         break
                 doc.tokens.append(Mention(t.idx+i, t.text))
 

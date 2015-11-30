@@ -1,8 +1,6 @@
 import json
 from HTMLParser import HTMLParser
-from re import findall, match, DOTALL
-
-markdown_characters = u"\\`*_{}[]()#+-.!"
+from re import findall, match, DOTALL, sub, compile
 
 def normalize_special_characters(text):
     """Replace special unicode characters in text"""
@@ -37,6 +35,8 @@ def normalize_special_characters(text):
 def markdown_to_whitespace(markdown_txt):
     """Convert a text from markdown whitespace padded unicode."""
     resu = u''
+    RE_MOVE_DOT = compile(r"(\s)([^\s]+)\\(\.\w)")
+    RE_MOVE_DASH = compile(r"(\s)([^\s]+)\\(-\w)")
 
     # remove table
     match_table = findall(ur'(<table>.+?</table>)', markdown_txt, DOTALL)
@@ -76,10 +76,19 @@ def markdown_to_whitespace(markdown_txt):
                 line = line.replace(link[0], ' ' + link[1] + ' ' + (' ' * len(link[2])))
                 links_txt = links_txt + link[1]
 
+            # U\.S\. -> U.S., instead of U. S.
+            line = sub(RE_MOVE_DOT, r"\1 \2\3", line)
+            line = sub(RE_MOVE_DASH, r"\1 \2\3", line)
+
+            left_replace = u"\\`*_{[(#+-!"
+            right_replace = u"}])."
+
             # remove extra backslash
-            for char in markdown_characters:
+            for char in left_replace:
                 line = line.replace(u"\\" + char, " " + char)
-            
+            for char in right_replace:
+                line = line.replace(u"\\" + char, char + " ")
+
             # add the text if it contains more than a link
             resu += line
 
