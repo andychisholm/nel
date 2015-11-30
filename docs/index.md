@@ -46,10 +46,10 @@ pip install git+http://git@github.com/wikilinks/nel.git
 
 To link entities, __nel__ first needs some model of who or what an entity is.
 
-__nel__ uses models from the __sift__ framework for entity linking.
+__nel__ uses models from the [sift](https://github.com/wikilinks/sift) framework for entity linking.
 
 To build models from scratch, you need a corpus of documents that link to entities in the KB.
 
 Wikipedia is a good staring point for notable named entities.
 
-See [Building a Wikipedia Linker](guides/model_building.md) to get started.
+See the [model build](guides/models.md) guide to get started.

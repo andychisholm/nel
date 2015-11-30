@@ -1,8 +1,8 @@
 # Building Wikipedia Models
 
-This example demonstrates the process of downloading, preprocessing and building models for linking entities in Wikipedia.
+This example demonstrates the process of downloading, preprocessing and building models of entities in Wikipedia.
 
-## Downloading and Preprocessing the latest Wikipedia Dump
+## Download and Preprocess the latest Wikipedia Dump
 
 __sift__ provides a handy script for downloading the latest partitioned Wikipedia dump.
 
@@ -28,7 +28,7 @@ sift build-corpus --save processed WikipediaArticles latest --redirects redirect
 
 Our wikipedia corpus is now in the standard format for __sift__ corpora from which models can be extracted.
 
-## Build Linking Feature Models
+## Build Feature Models
 
 We will now extract two simple count driven models from this corpus which are useful in entity linking.
 
@@ -48,7 +48,7 @@ This statistic helps us model the conditional probability of an entity given the
 sift build-doc-model --save necounts EntityNameCounts processed --lowercase redis --prefix models:necounts[wikipedia]:
 ```
 
-## Storing Feature Models
+## Push Models into the Data Store
 
 To access feature models efficiently at runtime, __nel__ requires that feature models are stored in either redis or mongodb.
 
@@ -74,10 +74,11 @@ zcat -r ecounts/*.gz | mongoimport --db models --collection ecounts[wikipedia]
 zcat -r necounts/*.gz | mongoimport --db models --collection necounts[wikipedia]
 ```
 
-## Verify Feature Models
+## Inspect the Models
 
 ```python
 from nel.model.disambiguation import EntityCounts
+
 ec = EntityCounts('wikipedia')
 ec.count('en.wikipedia.org/wiki/Apple_Inc.')
 ```
