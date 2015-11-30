@@ -4,7 +4,7 @@ import re
 import sys
 import textwrap
 
-from .corpora import prepare, analysis
+from .corpora import prepare, analysis, visualise
 from .harness import harness
 from .learn import ranking, resolving, recognition
 
@@ -20,6 +20,7 @@ log = logging.getLogger()
 APPS = [
     prepare.PrepareCorpus,
     analysis.CorpusStats,
+    visualise.CompareCorpusAnnotations,
     recognition.TrainSequenceClassifier,
     ranking.TrainLinearRanker,
     resolving.TrainLinearResolver,
