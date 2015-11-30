@@ -1,4 +1,6 @@
-# Prerequisites
+# Installation
+
+## Prerequisites
 
 ```
 # system packages
@@ -13,27 +15,9 @@ sudo yum -y install python-pip
 
 # install virtual env
 sudo pip install virtualenv
-
-# install stanford NER tools
-sudo yum -y install java wget unzip
-wget http://nlp.stanford.edu/software/stanford-ner-2014-08-27.zip
-unzip stanford-ner-2014-08-27.zip -d ner
-rm stanford-ner-2014-08-27.zip
 ```
 
-## libschwa
-
-See: https://github.com/schwa-lab/libschwa/wiki/Installing
-
-**Note:** On CentOS/AWS, you may need to update your `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` environment variables.
-
-E.g., adding the following to `/etc/profile`:
-```
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-```
-
-# Install the Linker
+## Install nel
 
 ```
 virtualenv ve
@@ -42,7 +26,18 @@ virtualenv ve
 pip install git+http://git@github.com/wikilinks/nel.git
 ```
 
-## Setting up a Data Store
+## Install a NER
+
+The easiest way to get started is to install the spaCy NER system and models.
+
+```
+pip install spaCy
+python -m spacy.en.download all
+```
+
+Alternatively, checkout the [NER guide](guides/ner.md) for other options.
+
+## Setup the Model Store
 
 To store linking models and work with offline corpora, nel requires access to some kind of data store.
 
@@ -50,13 +45,9 @@ Currently, redis and mongodb are supported.
 
 To configure the datastore, you must set the `NEL_DATASTORE_URI` environment variable.
 
-By default, mongodb is prefered:
-```
-export NEL_DATASTORE_URI='mongodb://localhost'
-```
+Redis should be preferred whenever linking models fit in memory as it allows for very fast model lookups at runtime.
 
-# Install the Eval Tools
-
+For example, a local redis instance may be configured as:
 ```
-pip install git+http://github.com/wikilinks/neleval.git#egg=neleval
+export NEL_DATASTORE_URI='redis://localhost'
 ```
