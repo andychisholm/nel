@@ -54,7 +54,8 @@ class CRFTagger(Tagger):
     def tag(self, doc):
         offset = 0
         doc.tokens = []
-        for sentence in self.tagger.mapper.iter_sequences(doc):
+        state = self.tagger.mapper.get_doc_state(doc)
+        for sentence in self.tagger.mapper.iter_sequences(doc, state):
             for t in sentence:
                 i = 0
                 for i, c in enumerate(doc.text[t.idx:t.idx+len(t.text)]):
@@ -62,7 +63,7 @@ class CRFTagger(Tagger):
                         break
                 doc.tokens.append(Mention(t.idx+i, t.text))
 
-            tags = self.tagger.tag(doc, sentence)
+            tags = self.tagger.tag(doc, sentence, state)
             start, tag_type = None, None
             for i, tag in enumerate(tags):
                 if start != None and tag[0] != 'I':

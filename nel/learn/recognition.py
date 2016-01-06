@@ -13,13 +13,15 @@ log = logging.getLogger()
 
 class TrainSequenceClassifier(object):
     """ Train a CRF sequence model for mention recognition over a corpus of documents. """
-    def __init__(self, corpus, tag, classifier_id):
+    def __init__(self, corpus, tag, classifier_id, nps_model_tag, verbose):
         if corpus == None:
             raise NotImplementedError    
 
         self.corpus_id = corpus
         self.tag_filter = tag
         self.classifier_id = classifier_id
+        self.nps_model_tag = nps_model_tag
+        self.verbose = verbose
 
     def __call__(self):
         log.info('Building training set...')
@@ -27,31 +29,33 @@ class TrainSequenceClassifier(object):
 
         log.info('Initialising feature extractors...')
         params = {
-            'window': (-1, 1)
+            'window': (-2, 2),
+            'nps_model_tag': self.nps_model_tag
         }
         self.feature_extractor = recognition.SequenceFeatureExtractor(**params)
 
-        trainer = pycrfsuite.Trainer(verbose=False)
+        trainer = pycrfsuite.Trainer(verbose=self.verbose)
         trainer.set_params({
             'c1': 1.,
             'c2': 0.001,
-            'max_iterations': 100,
-            'feature.possible_transitions': True
+            'max_iterations': 200,
         })
 
         log.info('Extracting features for training instances...')
         for doc in docs:
             gold_mentions = sorted((m.begin,m.end,m.tag) for c in doc.chains for m in c.mentions)
-            for s in self.feature_extractor.iter_sequences(doc):
-                features = self.feature_extractor.sequence_to_instance(doc, s)
+            state = self.feature_extractor.get_doc_state(doc)
+            for s in self.feature_extractor.iter_sequences(doc, state):
+                features = self.feature_extractor.sequence_to_instance(doc, s, state)
                 labels = list(self.iter_aligned_labels(s, gold_mentions))
                 trainer.append(features, labels)
 
         model_path = os.path.join(tempfile.gettempdir(), tempfile.gettempprefix() + '.ner.model')
 
-        log.info('Fitting model: %s ...', model_path)
+        log.info('Fitting model...')
         trainer.train(model_path)
 
+        log.info('Loading temporarily serialized model into datastore: %s ...', model_path)
         data = None
         with open(model_path, 'r') as f:
             data = f.read()
@@ -105,7 +109,9 @@ class TrainSequenceClassifier(object):
     @classmethod
     def add_arguments(cls, p):
         p.add_argument('classifier_id', metavar='CLASSIFIER_ID')
+        p.add_argument('nps_model_tag', metavar='NAME_PART_COUNT_MODEL')
         p.add_argument('--corpus', metavar='CORPUS', default=None, required=False)
         p.add_argument('--tag', metavar='TAG', default=None, required=False)
+        p.add_argument('--verbose', default=False, action='store_true')
         p.set_defaults(cls=cls)
         return p
