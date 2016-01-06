@@ -25,10 +25,11 @@ def trim_link_subsection(s):
 @PrepareCorpus.Register
 class MarkdownPrepare(object):
     """ Injest a set of markdown documents with neleval formatted annotations """
-    def __init__(self, docs_path, annotations_path, redirect_model_tag):
+    def __init__(self, docs_path, annotations_path, redirect_model_tag, target_entity_filter):
         self.docs_path = docs_path
         self.annotations_path = annotations_path
         self.redirect_model = Redirects(redirect_model_tag)
+        self.target_entity_filter = target_entity_filter
 
     def iter_mentions(self):
         with open(self.annotations_path, 'r') as f:
@@ -42,6 +43,10 @@ class MarkdownPrepare(object):
                     resolution_id = self.redirect_model.map(resolution_id)
                 if len(parts) > 5:
                     tag = parts[5].lower().strip()
+
+                if self.target_entity_filter and resolution_id:
+                    if not resolution_id.startswith(self.target_entity_filter):
+                        resolution_id = None
 
                 yield {
                     'doc': parts[0],
@@ -100,6 +105,7 @@ class MarkdownPrepare(object):
     def add_arguments(cls, p):
         p.add_argument('docs_path', metavar='SOURCE_DOCS_PATH')
         p.add_argument('annotations_path', metavar='ANNOTATIONS_TSV_PATH')
-        p.add_argument('--redirect_model_tag', default='wikipedia', required=False, metavar='REDIRECT_MODEL')
+        p.add_argument('--redirect-model-tag', dest='redirect_model_tag', default='wikipedia', required=False, metavar='REDIRECT_MODEL')
+        p.add_argument('--target-entity-filter', dest='target_entity_filter', default=None, required=False, metavar='FILTER')
         p.set_defaults(parsecls=cls)
         return p
