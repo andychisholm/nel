@@ -212,3 +212,14 @@ def to_json(doc):
                 'features': chain.resolution.features
             }
         } for chain in doc.chains for m in chain.mentions]})
+
+def to_sift(doc):
+    return json.dumps({
+        '_id': doc.id,
+        'text': doc.text,
+        'links': [{
+            'target': m.resolution.id,
+            'start': m.span.start,
+            'stop': m.span.stop
+        } for chain in doc.chains for m in chain.mentions]
+    })
