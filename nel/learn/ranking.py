@@ -42,7 +42,7 @@ class TrainLinearRanker(TrainMentionClassifier):
             'C': 0.01,
             'penalty': 'l2',
             'loss': 'hinge',
-            'class_weight': 'auto',
+            'class_weight': 'balanced',
             'fit_intercept': True
         }
 

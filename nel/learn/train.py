@@ -36,6 +36,9 @@ class TrainMentionClassifier(object):
             X.append(x)
             y.append(cls)
 
+        X = numpy.array(X)
+        y = numpy.array(y)
+
         log.info('Fitting model over %i instances...', len(y))
         classifier = self.init_model()
         classifier.fit(X, y)

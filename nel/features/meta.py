@@ -38,7 +38,7 @@ class ClassifierScore(ClassifierFeature):
         return 'ClassifierScore[%s]' % self._id
 
     def predict(self, fv):
-        return float(self.classifier.model.decision_function(fv))
+        return float(self.classifier.model.decision_function([fv]))
 
 @Feature.Extractable
 class ClassifierProbability(ClassifierFeature):
