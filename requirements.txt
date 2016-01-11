@@ -12,8 +12,8 @@ python-crfsuite==0.8.3
 pymongo==3.0
 python-dateutil==2.4.1
 redis==2.10.3
-scikit-learn==0.16.1
 scipy==0.15.1
+scikit-learn==0.16.1
 six==1.9.0
 wsgiref==0.1.2
 Pattern==2.6
