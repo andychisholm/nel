@@ -2,7 +2,7 @@ from pymongo import MongoClient
 
 from ..data import Store, ObjectStore, FieldStore, SetStore
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class MongoStore(Store):

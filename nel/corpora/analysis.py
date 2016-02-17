@@ -8,7 +8,7 @@ from pymongo import MongoClient
 
 from ..doc import Doc
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class CorpusStats(object):

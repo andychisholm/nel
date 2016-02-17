@@ -5,7 +5,7 @@ from .feature import Feature
 from .mapping import FEATURE_MAPPERS
 from ..model.resolution import Classifier
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class ClassifierFeature(Feature):

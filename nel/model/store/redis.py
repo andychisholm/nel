@@ -6,7 +6,7 @@ from itertools import islice, izip
 
 from ..data import Store, ObjectStore, FieldStore, SetStore
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class RedisStore(Store):

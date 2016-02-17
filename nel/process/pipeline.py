@@ -2,7 +2,7 @@ import json
 from . import tag, candidates, coref, resolve
 from ..features import feature
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class Pipeline(object):

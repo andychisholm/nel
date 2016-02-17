@@ -6,7 +6,7 @@ from itertools import izip
 
 from .data import ObjectStore
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 def msgpack_deserialize(data):

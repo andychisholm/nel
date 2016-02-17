@@ -5,7 +5,7 @@ from collections import Counter
 from .feature import Feature
 from ..model.disambiguation import EntityContext
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 def sparse_cosine_distance(a, b, norm=True):

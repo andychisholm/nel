@@ -9,7 +9,7 @@ from collections import defaultdict
 from bisect import bisect_left, bisect_right
 from contextlib import contextmanager
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 def get_from_module(cid, mod_params, mod_name, instantiate=False, kwargs=None):

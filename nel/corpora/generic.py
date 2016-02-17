@@ -8,7 +8,7 @@ from ..model.corpora import Redirects
 from ..process.tokenise import RegexTokeniser, TOKEN_RE
 from ..harness.format import markdown_to_whitespace
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 ENC = 'utf8'

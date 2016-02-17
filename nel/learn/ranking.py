@@ -3,7 +3,7 @@ import random
 from sklearn.svm import LinearSVC
 from .train import TrainMentionClassifier
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 def sample_by_magnitude(_, negatives, limit):

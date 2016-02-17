@@ -6,7 +6,7 @@ from spacy.en import English
 
 from ..model.recognition import NamePartCounts
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class SequenceFeatureExtractor(object):

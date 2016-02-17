@@ -7,7 +7,7 @@ from ..model.resolution import Classifier
 from ..features import mapping
 from .train import TrainMentionClassifier
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class FitNilThreshold(object):

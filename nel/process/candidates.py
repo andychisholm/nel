@@ -7,7 +7,7 @@ from ..model import recognition
 from ..doc import Mention, Chain, Candidate
 from ..model.disambiguation import NameProbability
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class CandidateGenerator(Process):

@@ -2,7 +2,7 @@
 from .process import Process
 from ..util import spanset_insert
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class Resolver(Process):

@@ -6,7 +6,7 @@ from datetime import datetime
 from .data import ObjectStore
 from ..features.mapping import FEATURE_MAPPERS
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class Classifier(object):

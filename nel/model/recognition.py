@@ -8,7 +8,7 @@ from datetime import datetime
 from itertools import izip
 from .data import ObjectStore
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class NamePartCounts(object):

@@ -7,7 +7,7 @@ from collections import defaultdict
 from itertools import islice, izip
 from pymongo import MongoClient
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 DATASTORE_URI_VAR = 'NEL_DATASTORE_URI'

@@ -4,7 +4,7 @@ from itertools import chain
 from ..doc import Chain
 from .process import Process
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class MentionClusterer(Process):

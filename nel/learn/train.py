@@ -6,7 +6,7 @@ from ..doc import Doc
 from ..features import mapping
 from ..model.resolution import Classifier
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class TrainMentionClassifier(object):

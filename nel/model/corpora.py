@@ -1,6 +1,6 @@
 from .data import ObjectStore
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class Redirects(object):

@@ -5,7 +5,7 @@ from ..model.disambiguation import EntityEmbeddings
 from scipy.spatial.distance import cosine
 from scipy.stats import gmean
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 @Feature.Extractable

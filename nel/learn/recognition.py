@@ -8,7 +8,7 @@ from ..doc import Doc
 from ..model.recognition import SequenceClassifier
 from ..features import recognition
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class TrainSequenceClassifier(object):

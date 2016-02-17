@@ -5,7 +5,7 @@ from .feature import Feature
 from ..model import disambiguation
 from ..process.candidates import CandidateGenerator
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class LogFeature(Feature):    

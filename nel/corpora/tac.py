@@ -11,7 +11,7 @@ from ..process.tag import Tagger, StanfordTagger
 from ..process.tokenise import RegexTokeniser, TOKEN_RE
 from ..harness.format import markup_to_whitespace
 
-import logging
+from nel import logging
 
 log = logging.getLogger()
 ENC = 'utf8'

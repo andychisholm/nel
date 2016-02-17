@@ -7,7 +7,7 @@ from ..util import parmapper
 
 from progressbar import ProgressBar, Bar, Counter, ETA, FileTransferSpeed, Percentage, Timer
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class Process(object):

@@ -14,7 +14,7 @@ from .process.candidates import CandidateGenerator
 from .process.coref import MentionClusterer
 from .features.feature import Feature
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 APPS = [

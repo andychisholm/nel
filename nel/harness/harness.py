@@ -12,7 +12,7 @@ from ..harness import format
 from ..process import cluster, resolve
 from ..process.pipeline import Pipeline
 
-import logging
+from nel import logging
 log = logging.getLogger()
 
 class ServiceHarness(object):
