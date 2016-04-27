@@ -18,7 +18,7 @@ First, we must extract redirect mappings to properly resolve inter-article links
 sift build-corpus --save redirects WikipediaRedirects latest json
 ```
 
-The extracted rediect mappings are now stored under the `redirects` directory.
+The extracted redirect mappings are now stored under the `redirects` directory.
 
 Next, we perform full plain-text extraction over the Wikipedia dump, mapping links to their current Wikipedia target.
 
@@ -32,9 +32,9 @@ Our wikipedia corpus is now in the standard format for __sift__ corpora from whi
 
 We will now extract two simple count driven models from this corpus which are useful in entity linking.
 
-The first of model, "EntityCounts" is simply the total number of linkings for an entity over the corpus.
+The first model, "EntityCounts" simply collects the total count of inlinks for each entity over the corpus.
 
-We use this statistic as a proxy for the prior probability of an entity and expect that entities with a higher prior are more likely to linked.
+We use this statistic as a proxy for the prior probability of an entity and expect that entities with higher counts are more likely to be linked.
 
 ```
 sift build-doc-model --save ecounts EntityCounts processed redis --prefix models:ecounts[wikipedia]:
@@ -42,7 +42,7 @@ sift build-doc-model --save ecounts EntityCounts processed redis --prefix models
 
 The second model, "EntityNameCounts" collects the number of times a given anchor text string is used to link an entity.
 
-This statistic helps us model the conditional probability of an entity given the name used in text.
+This statistic helps us model the conditional probability of an entity given the name used to reference it in text.
 
 ```
 sift build-doc-model --save necounts EntityNameCounts processed --lowercase redis --prefix models:necounts[wikipedia]:

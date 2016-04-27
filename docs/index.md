@@ -4,21 +4,20 @@ __nel__ is an fast, accurate and highly modular framework for linking entities i
 
 Out of the box, __nel__ provides:
 
-- named entity recognition (DIY, or plug-in a NER system like Stanford, spaCy or Schwa)
-- in-document coreference clustering
-- candidate generation
-- multiple disambiguation features
+- named entity recognition
+- coreference clustering and candidate generation
+- multipple entity disambiguation feature models
 - a supervised learning-to-rank framework for entity disambiguation
 - a supervised nil detection system with configurable confidence thresholds
-- nil clustering
-- support for evaluation and error analysis of linking system output
+- basic nil clustering for out-of-KB entities
+- support for evaluating linker performance and running error analysis
 
-__nel__ is completely modular, it can:
+__nel__ is modular, it can:
 
-- link entities to any knowledge base you like (not limited to just Wikipedia or Freebase)
-- update, rebuild and redeploy linking models as a knowledge base changes over time
-- retrain recognition and disambiguation models on your own corpus of documents
-- easily adapt a linking pipeline to meet performance and accuracy tradeoffs
+- link entity mentions to any knowledge base you like (not just Wikipedia and Freebase!)
+- update, rebuild and redeploy models as a knowledge base changes over time
+- retrain recognition and disambiguation classifiers on your own corpus of documents
+- adapt linking pipelines to meet performance, precision and recall tradeoffs
 
 __nel__ is flexible, you can run it:
 
