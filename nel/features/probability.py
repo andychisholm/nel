@@ -22,8 +22,12 @@ class EntityProbability(LogFeature):
         self.tag = entity_model_tag
         self.em = disambiguation.EntityCounts(self.tag)
 
+    def compute_doc_state(self, doc):
+        candidates = set(c.id for chain in doc.chains for c in chain.candidates)
+        return dict(self.em.iter_counts(candidates))
+
     def compute_raw(self, doc, chain, candidate, state):
-        return self.em.count(candidate.id) + 0.1
+        return state[candidate.id] + 0.1
 
     @classmethod
     def add_arguments(cls, p):
