@@ -23,9 +23,13 @@ class EmbeddingCoherence(Feature):
 
         # threshold on the minimum rank of candidates
         # for which coherence will be computed
+        # rerank depth must be >= coherence depth
         self.rerank_depth = 5
 
-        #assert(self.rerank_depth >= self.coherence_depth)
+        # maximum number of chains with which coherence is compared
+        # if len(chains) is greater then chains are randomly subsampled
+        # lowering this limit improves worst case performance for huge documents
+        self.max_coherent_chains = 250
 
     @property
     def id(self):
@@ -44,6 +48,7 @@ class EmbeddingCoherence(Feature):
                     candidates.add(c.id)
         candidate_embeddings = self.em.get_embeddings(candidates)
 
+        # ensure we only compute pairwise distance once
         distance_cache = {}
         def candidate_distance(a, b):
             if a < b:
@@ -53,15 +58,18 @@ class EmbeddingCoherence(Feature):
                 distance_cache[key] = self.distance(candidate_embeddings[a], candidate_embeddings[b])
             return distance_cache[key]
 
+        # if the document is too large, only consider coherence with a random subset
+        coherent_chains = doc.chains if len(doc.chains) < self.max_coherent_chains else random.sample(doc.chains, self.max_coherent_chains)
+
         # precompute the top candidates for each chain
         rc_by_chain = {}
-        for chain in doc.chains:
+        for chain in coherent_chains:
             rc_by_chain[chain] = [c.id for c in sorted(chain.candidates, key=lambda c: c.features[self.ranking_feature], reverse=True)][:self.coherence_depth+1]
 
         state = {}
         for c in candidates:
             dists = []
-            for chain in doc.chains:
+            for chain in coherent_chains:
                 top = [ci for ci in rc_by_chain[chain] if ci != c][:self.coherence_depth]
                 if not top:
                     continue
