@@ -32,7 +32,7 @@ class SequenceClassifier(object):
             from ..features.recognition import SequenceFeatureExtractor
             self.mapper = SequenceFeatureExtractor(**dm.get('params', {}))
         else:
-            raise Exception('No sequence classifier found for name (%s) in store', self.name)
+            raise Exception('No sequence classifier found for name (%s) in store' % self.name)
 
     def tag(self, doc, sequence, state):
         return self.model.tag(self.mapper.sequence_to_instance(doc, sequence, state))
