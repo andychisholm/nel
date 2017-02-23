@@ -1,7 +1,42 @@
+import os
 import mmap
 import cPickle as pickle
 import operator
 from functools32 import lru_cache
+
+from ..data import Store, ObjectStore
+from nel import logging
+log = logging.getLogger()
+
+class FileObjectStore(ObjectStore):
+    def __init__(self, path):
+        self.store = mmdict(path)
+
+    @classmethod
+    def get_protocol(cls):
+        return 'file'
+
+    def iter_ids(self):
+        return self.store.iterkeys()
+
+    def exists(self, oid):
+        return oid in self.store
+
+    def fetch(self, oid):
+        return self.store[oid]
+
+    def fetch_many(self, oids):
+        return [self.fetch(oid) for oid in oids]
+
+    def fetch_all(self):
+        return self.store.iteritems()
+
+    @classmethod
+    def Get(cls, store_id, uri='file://', **kwargs):
+        path = store_id.replace(':', '/')
+        if uri and uri.startswith('file://'):
+            path = os.path.join(uri[7:], path)
+        return cls(path)
 
 class mmdict(object):
     def __init__(self, path):
