@@ -22,7 +22,7 @@ class Doc(object):
         if self._id != None:
             jd['_id'] = self._id
         return jd
-    
+
     @staticmethod
     def obj(json):
         return Doc(
@@ -51,7 +51,7 @@ class Chain(object):
     def obj(json):
         return Chain(
             [Mention.obj(m) for m in json['mentions']],
-            [Candidate.obj(c) for c in json['candidates']],
+            [Candidate.obj(c) for c in json.get('candidates', [])],
             Candidate.obj(json['resolution']) if json['resolution'] else None)
 
 class Mention(object):
@@ -83,7 +83,7 @@ class Mention(object):
             json['text'],
             json.get('tag', None),
             json.get('mid', None),
-            Candidate.obj(json['resolution']) if json['resolution'] else None)
+            Candidate.obj(json['resolution']) if 'resolution' in json else None)
 
     @property
     def end(self):
@@ -106,6 +106,5 @@ class Candidate(object):
 
     @staticmethod
     def obj(json):
-        return Candidate(
-            json['id'],
-            json['features'])
+        return Candidate(json['id'], json.get('features'))
+

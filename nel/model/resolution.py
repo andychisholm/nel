@@ -11,24 +11,26 @@ log = logging.getLogger()
 
 class Classifier(object):
     mid = 'models:classifiers'
-    def __init__(self, name):
+    def __init__(self, name, mapper, model):
         self.name = name
-        dm = ObjectStore.Get(self.mid).fetch(name)
-        if dm:
-            # undo the data store encoding here - it's really binary data
-            self.model = pickle.loads(dm['data'].encode('utf-8'))
-            self.mapper = FEATURE_MAPPERS[dm['mapping']['name']](**dm['mapping']['params'])
-        else:
-            raise Exception('No classifier for name (%s) in store', self.name)
+        self.mapper = mapper
+        self.model = model
 
     @classmethod
-    def create(cls, name, mapping, data, metadata = {}):
+    def load(cls, name):
+        dm = ObjectStore.Get(cls.mid).fetch(name)
+        if not dm:
+            raise Exception('No classifier for name (%s) in store', name)
+        return cls(**pickle.loads(dm['data']))
+
+    def save(self):
         timestamp = datetime.fromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
-        log.info('Storing classifier model (%s)...', name)
+        log.info('Storing classifier model (%s)...', self.name)
         ObjectStore.Get(cls.mid).save({
             '_id': name,
-            'created_at': timestamp,
-            'mapping': mapping,
-            'data': data,
-            'metadata': metadata
+            'data': pickle.dumps({
+                'name': self.name,
+                'model': self.model,
+                'mapper': self.mapper
+            })
         })

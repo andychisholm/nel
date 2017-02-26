@@ -10,6 +10,7 @@ log = logging.getLogger()
 
 class FileObjectStore(ObjectStore):
     def __init__(self, path):
+        self.path = path
         self.store = mmdict(path)
 
     @classmethod
@@ -31,12 +32,21 @@ class FileObjectStore(ObjectStore):
     def fetch_all(self):
         return self.store.iteritems()
 
+    def save_many(self, obj_iter):
+        self.store.close()
+        mmdict.write(self.path, ((o['_id'], o) for o in obj_iter))
+        self.store = mmdict(self.path)
+
     @classmethod
-    def Get(cls, store_id, uri='file://', **kwargs):
+    def GetPath(cls, store_id, uri):
         path = store_id.replace(':', '/')
         if uri and uri.startswith('file://'):
             path = os.path.join(uri[7:], path)
-        return cls(path)
+        return path
+
+    @classmethod
+    def Get(cls, store_id, uri='file://', **kwargs):
+        return cls(cls.GetPath(store_id, uri))
 
 class mmdict(object):
     def __init__(self, path):
@@ -44,16 +54,15 @@ class mmdict(object):
         self.index = {}
         
         index_path = self.path + '.index'
-        log.debug('Loading mmap store: %s ...' % index_path)
-        with open(index_path, 'rb') as f:
-            while True:
-                try:
-                    key, offset = self.deserialise(f)
-                    self.index[key] = offset
-                except EOFError: break
+        if os.path.exists(index_path):
+            log.debug('Loading mmap store: %s ...' % index_path)
+            with open(index_path, 'rb') as f:
+                self.index = dict(self.deserialise(f))
 
-        self.data_file = open(path + '.data', 'rb')
-        self.data_mmap = mmap.mmap(self.data_file.fileno(), 0, prot=mmap.PROT_READ)
+            self.data_file = open(path + '.data', 'rb')
+            self.data_mmap = mmap.mmap(self.data_file.fileno(), 0, prot=mmap.PROT_READ)
+        else:
+            log.warn('No existing mmap store found: %s ...' % index_path)
 
     @staticmethod
     def serialise(obj, f):
@@ -118,7 +127,10 @@ class mmdict(object):
 
     @staticmethod
     def write(path, iter_kvs):
-        with open(path + '.index','wb') as f_index, open(path + '.data', 'wb') as f_data:
+        index = []
+        with open(path + '.data', 'wb') as f:
             for key, value in iter_kvs:
-                mmdict.serialise((key,f_data.tell()), f_index)
-                mmdict.serialise(value, f_data)
+                index.append((key, f.tell()))
+                mmdict.serialise(value, f)
+        with open(path + '.index','wb') as f:
+            mmdict.serialise(index, f)

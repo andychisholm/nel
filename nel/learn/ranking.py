@@ -25,9 +25,8 @@ def sample_by_std(_, negatives, limit):
 
 class TrainLinearRanker(TrainMentionClassifier):
     """ Trains a linear candidate ranker over a corpus of documents. """
-    def __init__(self, **kwargs):
-        kwargs['mapping'] = 'PolynomialMapper'
-        super(TrainLinearRanker, self).__init__(**kwargs)
+    def __init__(self, name, features):
+        super(TrainLinearRanker, self).__init__(name, features, 'PolynomialMapper')
 
         # todo: parameterise instance selection parameters
         self.sample_instances = sample_by_magnitude

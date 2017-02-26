@@ -11,22 +11,15 @@ log = logging.getLogger()
 
 class TrainMentionClassifier(object):
     """ Abstract class for training an SVM classifier over mentions in a corpus of documents. """
-    def __init__(self, corpus, tag, feature, classifier_id, mapping):
-        if corpus == None:
-            # todo: multi corpus training
-            raise NotImplementedError    
-
-        self.corpus_id = corpus
-        self.tag_filter = tag
-        self.features = feature
+    def __init__(self, tag, features, mapping):
+        self.tag = tag
+        self.features = features
         self.mapping = mapping
-        self.classifier_id = classifier_id
 
     def init_model(self):
         raise NotImplementedError
 
-    def __call__(self):
-        docs = self.get_docs(self.corpus_id, self.tag_filter)
+    def __call__(self, docs):
         mapper_params = self.get_mapper_params(self.features, docs)
         mapper = self.get_mapper(self.mapping, mapper_params)
 
@@ -46,16 +39,8 @@ class TrainMentionClassifier(object):
         correct = sum(1.0 for i, _y in enumerate(classifier.predict(X)) if y[i] == _y)
         log.info('Training set pairwise classification: %.1f%% (%i/%i)', correct*100/len(y), int(correct), len(y))
 
-        mapping = {
-            'name': mapper.__class__.__name__,
-            'params': mapper_params
-        }
-        metadata = {
-            'corpus': self.corpus_id,
-            'tag': self.tag_filter
-        }
-        Classifier.create(self.classifier_id, mapping, pickle.dumps(classifier), metadata)
         log.info('Done.')
+        return Classifier(self.tag, mapper, classifier)
 
     def iter_instances(self, docs):
         raise NotImplementedError

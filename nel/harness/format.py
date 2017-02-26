@@ -1,6 +1,8 @@
 import json
 from HTMLParser import HTMLParser
 from re import findall, match, DOTALL, sub, compile
+from collections import defaultdict
+from nel.doc import Doc
 
 def normalize_special_characters(text):
     """Replace special unicode characters in text"""
@@ -212,6 +214,25 @@ def to_json(doc):
                 'features': chain.resolution.features
             }
         } for chain in doc.chains for m in chain.mentions]})
+
+def from_sift(doc):
+    links_by_target = defaultdict(list)
+    for m in doc['links']:
+        links_by_target[m['target']].append(m)
+
+    return Doc.obj({
+        'id': doc['_id'],
+        'text': doc['text'],
+        'tag': None,
+        'chains': [{
+            'resolution': {'id': target},
+            'mentions': [{
+                'resolution': {'id': target},
+                'begin': l['start'],
+                'text': doc['text'][l['start']:l['stop']],
+            } for l in links]
+        } for target, links in links_by_target.iteritems()]
+    })
 
 def to_sift(doc):
     return json.dumps({
