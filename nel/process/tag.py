@@ -10,6 +10,8 @@ from bisect import bisect_left
 from subprocess import Popen, PIPE
 from cStringIO import StringIO
 
+import spacy
+
 from .process import Process
 from ..model import recognition
 from ..doc import Mention, Chain, Candidate
@@ -39,6 +41,21 @@ class Tagger(Process):
         for c in globals().itervalues():
             if c != cls and isinstance(c, type) and issubclass(c, cls):
                 yield c
+
+class SpacyTagger(Tagger):
+    def __init__(self, spacy_model = None):
+        self.spacy_model = spacy_model or 'en_default'
+        log.debug('Using spacy entity tagger (%s)...', spacy_model)
+        self.nlp = spacy.load(self.spacy_model)
+
+    def tag(self, doc):
+        spacy_doc = self.nlp(doc.text)
+        doc.tokens = [Mention(t.idx, t.text) for t in spacy_doc]
+
+        for ent in spacy_doc.ents:
+            tok_idxs = [i for i in xrange(len(ent)) if not ent[i].is_space]
+            if tok_idxs:
+                yield self.mention_over_tokens(doc, ent.start + min(tok_idxs), ent.start + max(tok_idxs) + 1, ent.label_)
 
 class CRFTagger(Tagger):
     """ Conditional random field sequence tagger """
