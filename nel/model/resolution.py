@@ -26,11 +26,12 @@ class Classifier(object):
     def save(self):
         timestamp = datetime.fromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
         log.info('Storing classifier model (%s)...', self.name)
-        ObjectStore.Get(cls.mid).save({
-            '_id': name,
+        ObjectStore.Get(self.mid).save({
+            '_id':self.name,
             'data': pickle.dumps({
                 'name': self.name,
                 'model': self.model,
                 'mapper': self.mapper
             })
         })
+        
