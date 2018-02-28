@@ -38,7 +38,7 @@ class FileObjectStore(ObjectStore):
         self.store = mmdict(self.path)
 
     def save(self,obj):
-        self.save_man([obj])
+        self.save_many([obj])
        
     @classmethod
     def GetPath(cls, store_id, uri):
