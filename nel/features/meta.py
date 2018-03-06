@@ -11,7 +11,12 @@ log = logging.getLogger()
 class ClassifierFeature(Feature):
     """ Computes a feature score based on the output of a classifier over a set of features. """
     def __init__(self, classifier):
-        self.classifier = classifier
+        if isinstance(classifier,(str,unicode)):
+           self.classifier = Classifier.load(classifier) 
+        elif isinstance(classifier,Classifier):
+            self.classifier = classifier
+        else:
+            raise Exception("Unknown classifier %s."%classifier)
 
     def compute_doc_state(self, doc):
         doc = self.classifier.mapper(doc) 
@@ -41,3 +46,4 @@ class ClassifierProbability(ClassifierFeature):
 
     def predict(self, fv):
         return self.classifier.model.predict_proba(fv)[0][1]
+    
