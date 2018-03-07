@@ -10,13 +10,11 @@ log = logging.getLogger()
 
 class ClassifierFeature(Feature):
     """ Computes a feature score based on the output of a classifier over a set of features. """
-    def __init__(self, classifier):
-        if isinstance(classifier,(str,unicode)):
-           self.classifier = Classifier.load(classifier) 
-        elif isinstance(classifier,Classifier):
-            self.classifier = classifier
-        else:
-            raise Exception("Unknown classifier %s."%classifier)
+    def __init__(self, classifier=None, classifier_model_tag=None):
+        if (classifier_model_tag is None) == (classifier is None):
+            raise Exception('You must provide a classifier_model_tag or classifier instance, but not both.')
+        self.classifier = classifier or Classifier.load(classifier_model_tag) 
+
 
     def compute_doc_state(self, doc):
         doc = self.classifier.mapper(doc) 
